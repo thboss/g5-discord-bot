@@ -47,7 +47,8 @@ class Teams:
             'auth_name': {
                 db_user.steam: {
                     'name': db_user.user.display_name,
-                    'captain': index == 0
+                    'captain': index == 0,
+                    'coach': False
                 } for index, db_user in enumerate(db_users)
             }
         }
