@@ -149,11 +149,9 @@ class PlayerStats:
                 players = list(
                     filter(lambda x: x['steam'] in db_steam_ids, resp_data))
                 api_steam_ids = [player['steam'] for player in players]
-                api_steam_ids = list(filter(lambda x: x in db_steam_ids, api_steam_ids))
 
                 for steam_id in db_steam_ids:
                     if steam_id not in api_steam_ids:
-                        api_steam_ids.append(steam_id)
                         players.append({
                             "steam": steam_id,
                             "score": 1000,
@@ -237,8 +235,8 @@ class PlayerStats:
                         })
 
                 players.sort(key=lambda x: db_steam_ids.index(x['steam']))
-                for i, p in enumerate(players):
-                    p['name'] = users[i].user.display_name
+                for idx, db_user in enumerate(users):
+                    players[idx]['name'] = db_user.user.display_name
 
                 return [cls(player) for player in players]
         except ContentTypeError:
