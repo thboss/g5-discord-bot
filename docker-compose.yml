@@ -1,0 +1,37 @@
+version: "3.7"
+
+services:
+  g5botdb:
+    image: postgres:14.4-alpine
+    container_name: g5botdb
+    restart: always
+    networks:
+      - get5
+    environment:
+      - POSTGRES_PASSWORD=
+      - POSTGRES_USER=g5
+      - POSTGRES_DB=g5
+  
+  g5bot:
+    image: ghcr.io/thboss/g5bot:latest
+    restart: always
+    depends_on:
+      - g5botdb
+    container_name: g5bot
+    networks:
+      - get5
+    environment:
+      - SQLUSER=g5
+      - SQLPASSWORD=
+      - DATABASE=g5
+      - SQLHOST=g5botdb
+      - SQLPORT=5432
+      - LANGUAGE=en
+      - PREFIXES=q! Q!
+      - TOKEN=
+      - APIURL=
+      - FRONTENDURL=
+
+networks:
+  get5:
+    external: true
