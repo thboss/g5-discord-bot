@@ -45,7 +45,8 @@ class User:
     async def get_users(users, guild):
         """"""
         users_ids = [u.id for u in users]
-        sql = 'SELECT * FROM users WHERE discord_id = ANY($1::BIGINT[]);'
+        sql = "SELECT * FROM users\n" \
+            "    WHERE discord_id = ANY($1::BIGINT[]) AND steam_id IS NOT NULL;"
         users_data = await G5.db.query(sql, users_ids)
         users_data.sort(key=lambda x: users_ids.index(x['discord_id']))
         return [User.from_dict(user_data, guild) for user_data in users_data]
