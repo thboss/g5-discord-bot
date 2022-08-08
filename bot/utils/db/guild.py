@@ -32,7 +32,7 @@ class Guild:
         self.teams_channel = teams_channel
         self.results_channel = results_channel
         self.category = category
-        self.is_setup = headers and linked_role and prematch_channel and leaders_channel and teams_channel
+        self.is_setup = headers and linked_role
 
     @classmethod
     def from_dict(cls, guild_data: dict):
