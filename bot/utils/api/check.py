@@ -8,8 +8,8 @@ from ..utils import Utils
 
 async def check_auth(headers):
     """"""
-    try:
-        async with Sessions.requests.get(url=Config.api_url, headers=headers) as resp:
+    try: # in some cases api must end with slash to work 
+        async with Sessions.requests.get(url=Config.api_url + '/', headers=headers) as resp:
             resp_data = await resp.json()
             G5.bot.logger.info('Response: ' + resp_data['message'])
     except ContentTypeError:
