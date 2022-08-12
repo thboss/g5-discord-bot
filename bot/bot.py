@@ -25,7 +25,7 @@ INTENTS_JSON = os.path.join(_CWD, 'intents.json')
 class G5Bot(commands.AutoShardedBot):
     """ Sub-classed AutoShardedBot modified to fit the needs of the application. """
 
-    def __init__(self):
+    def __init__(self, loop):
         """ Set attributes and configure bot. """
         # Call parent init
         with open(INTENTS_JSON) as f:
@@ -34,6 +34,8 @@ class G5Bot(commands.AutoShardedBot):
         intents = discord.Intents(**intents_attrs)
         super().__init__(command_prefix=Config.prefixes,
                          case_insensitive=True, intents=intents)
+
+        self.loop = loop
 
         # Set constants
         self.color = 0x0086FF
@@ -183,5 +185,6 @@ class G5Bot(commands.AutoShardedBot):
         await super().close()
         await G5.db.close()
 
-        self.logger.info('Closing API helper client session')
-        await Sessions.requests.close()
+        if hasattr(Sessions, 'requests'):
+            self.logger.info('Closing API helper client session')
+            await Sessions.requests.close()
