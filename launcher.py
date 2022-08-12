@@ -13,16 +13,8 @@ load_dotenv()  # Load the environment variables in the local .env file
 
 db_connect_url = 'postgresql://{POSTGRESQL_USER}:{POSTGRESQL_PASSWORD}@{POSTGRESQL_HOST}:{POSTGRESQL_PORT}/{POSTGRESQL_DB}'
 db_connect_url = db_connect_url.format(**os.environ)
-
-if os.name == 'nt':
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
-def _get_loop():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    return loop
-
-pool = _get_loop().run_until_complete(asyncpg.create_pool(db_connect_url))
+loop = asyncio.get_event_loop()
+pool = loop.run_until_complete(asyncpg.create_pool(db_connect_url))
 logger = logging.getLogger('G5.db')
 
 
@@ -90,7 +82,7 @@ def run_bot():
 
     # Instantiate bot and run
     from bot.bot import G5Bot
-    bot = G5Bot(loop=_get_loop())
+    bot = G5Bot()
     bot.run()
 
 
