@@ -168,7 +168,7 @@ class LobbyCog(commands.Cog):
         })
         db_lobby = await DB.Lobby.get_lobby_by_id(lobby_id, ctx.guild.id)
         db_guild = await DB.Guild.get_guild_by_id(ctx.guild.id)
-        category = await ctx.guild.create_category_channel(name=f"Lobby #{lobby_id} [PUBLIC]")
+        category = await ctx.guild.create_category_channel(name=f"Lobby #{lobby_id}")
         queue_channel = await ctx.guild.create_text_channel(category=category, name='Setup')
         lobby_channel = await ctx.guild.create_voice_channel(category=category, name='Lobby', user_limit=10)
 
@@ -764,22 +764,8 @@ class LobbyCog(commands.Cog):
         awaitables = []
 
         for db_lobby in guild_lobbies:
-            awaitables.append(self.update_queue_msg(db_lobby))
-            category = db_lobby.category
-            queue_channel = db_lobby.queue_channel
-            lobby_channel = db_lobby.lobby_channel
-            update_stmt = {}
-            if not category:
-                category = await guild.create_category_channel(name=f"Lobby #{db_lobby.id} [PUBLIC]")
-                update_stmt['category'] = category.id
-            if not queue_channel:
-                queue_channel = await guild.create_text_channel(category=category, name='Setup')
-                update_stmt['queue_channel'] = queue_channel.id
-            if not lobby_channel:
-                lobby_channel = await guild.create_voice_channel(category=category, name='Lobby', user_limit=db_lobby.capacity)
-                update_stmt['lobby_channel'] = lobby_channel.id
-            if update_stmt:
-                await db_lobby.update(update_stmt)
+            if db_lobby.queue_channel and db_lobby.lobby_channel:
+                awaitables.append(self.update_queue_msg(db_lobby))
 
         if awaitables:
             asyncio.gather(*awaitables, loop=G5.bot.loop,
