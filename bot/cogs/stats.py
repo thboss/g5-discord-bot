@@ -23,20 +23,13 @@ class StatsCog(commands.Cog):
         try:
             seasons = await API.Seasons.my_seasons(db_guild.headers)
             for season in seasons:
-                stats = await API.PlayerStats.get_player_stats(db_user, season_id=season.id)
-                if stats:
-                    file = Utils.generate_statistics_img(stats, season)
-                    await ctx.send(file=file)
+                await self._playerstats(ctx, db_user, pug=False, season_id=season.id)
+                await self._playerstats(ctx, db_user, pug=True, season_id=season.id)
         except Exception as e:
             G5.bot.logger.info(str(e))
 
-        try:
-            stats = await API.PlayerStats.get_player_stats(db_user)
-            file = Utils.generate_statistics_img(stats)
-            await ctx.send(file=file)
-        except Exception as e:
-            G5.bot.logger.info(str(e))
-            raise commands.CommandInvokeError(str(e))
+        await self._playerstats(ctx, db_user, pug=True)
+        await self._playerstats(ctx, db_user, pug=False)
 
     @ tasks.loop(seconds=300.0)
     async def update_leaderboard(self):
@@ -59,20 +52,29 @@ class StatsCog(commands.Cog):
             try:
                 seasons = await API.Seasons.my_seasons(db_guild.headers)
                 for season in seasons:
-                    season_players = await API.PlayerStats.get_leaderboard(users, season_id=season.id)
-                    season_players.sort(key=lambda u: u.score, reverse=True)
-                    if season_players:
-                        file = Utils.generate_leaderboard_img(
-                            season_players[:10], season)
-                        await leaders_channel.send(file=file)
+                    await self._leaderboard(leaders_channel, users, pug=True, season_id=season.id)
             except Exception as e:
                 G5.bot.logger.info(str(e))
 
-            try:
-                players = await API.PlayerStats.get_leaderboard(users)
-                players.sort(key=lambda u: u.score, reverse=True)
-                if players:
-                    file = Utils.generate_leaderboard_img(players[:10])
-                    await leaders_channel.send(file=file)
-            except Exception as e:
-                G5.bot.logger.info(str(e))
+            await self._leaderboard(leaders_channel, users, pug=True)
+            await self._leaderboard(leaders_channel, users, pug=False)
+
+    async def _playerstats(self, ctx, db_user, pug=False, season_id=None):
+        """"""
+        try:
+            stats = await API.PlayerStats.get_player_stats(db_user, pug=pug, season_id=season_id)
+            file = Utils.generate_statistics_img(stats)
+            await ctx.send(file=file)
+        except Exception as e:
+            G5.bot.logger.info(str(e))
+
+    async def _leaderboard(self, channel, users, pug=False, season_id=None):
+        """"""
+        try:
+            players = await API.PlayerStats.get_leaderboard(users, pug=pug, season_id=season_id)
+            players.sort(key=lambda u: u.rating, reverse=True)
+            if players:
+                file = Utils.generate_leaderboard_img(players[:10])
+                await channel.send(file=file)
+        except Exception as e:
+            G5.bot.logger.info(str(e))
