@@ -7,7 +7,7 @@ from ..utils import Utils, API, DB
 from ..menus import PickTeams, MapVeto, Embeds
 from ..resources import G5
 
-from random import shuffle
+from random import shuffle, sample
 from asyncpg.exceptions import UniqueViolationError
 import traceback
 import asyncio
@@ -313,6 +313,10 @@ class MatchCog(commands.Cog):
         team2_users = temp_users[team_size:]
         return team1_users, team2_users
 
+    def random_map(self, mpool, series):
+        """"""
+        return sample(mpool, int(series[2]))
+
     async def update_setup_msg(self, message, desc, title=Utils.trans('match-setup-process')):
         """"""
         embed = G5.bot.embed_template(title=title, description=desc)
@@ -375,9 +379,12 @@ class MatchCog(commands.Cog):
             await self.update_setup_msg(message, description)
 
             mpool = await db_lobby.get_maps()
-            veto_menu = MapVeto(
-                message, db_lobby.series, mpool[:18])
-            maps_list = await veto_menu.veto(team1_users[0], team2_users[0])
+            if db_lobby.map_method == 'veto':
+                veto_menu = MapVeto(
+                    message, db_lobby.series, mpool[:18])
+                maps_list = await veto_menu.veto(team1_users[0], team2_users[0])
+            else:
+                maps_list = self.random_map(mpool, db_lobby.series)
 
             description = description.replace('⌛️', '✅')
             description += '\n⌛️ 3. ' + Utils.trans('find-servers')

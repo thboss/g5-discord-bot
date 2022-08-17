@@ -221,6 +221,9 @@
     "autoready-already-enabled": "Auto ready is already enabled", 
     "autoready-already-disabled": "Auto ready is already disabled",
     "autoready-enabled-success": "Auto ready has successfully been enabled",
-    "autoready-disabled-success": "Auto ready has successfully been disabled"
+    "autoready-disabled-success": "Auto ready has successfully been disabled",
+    "command-maps-brief": "Set maps selection method of the lobby (Must have admin perms)",
+    "maps-method-already": "The current maps selection method is already set to **{}**",
+    "set-maps-method": "Maps selection method set to **{}**"
   }
 }

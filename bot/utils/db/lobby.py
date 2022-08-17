@@ -20,6 +20,7 @@ class Lobby:
         message_id,
         team_method,
         captain_method,
+        map_method,
         season_id,
         pug,
         team1_id,
@@ -38,6 +39,7 @@ class Lobby:
         self.message_id = message_id
         self.team_method = team_method
         self.captain_method = captain_method
+        self.map_method = map_method
         self.season_id = season_id
         self.pug = pug
         self.team1_id = team1_id
@@ -60,6 +62,7 @@ class Lobby:
             lobby_data['last_message'],
             lobby_data['team_method'],
             lobby_data['captain_method'],
+            lobby_data['map_method'],
             lobby_data['season_id'],
             lobby_data['pug'],
             lobby_data['team1_id'],

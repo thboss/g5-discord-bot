@@ -388,6 +388,32 @@ class LobbyCog(commands.Cog):
         message = await ctx.send(embed=embed)
         Utils.clear_messages([message, ctx.message])
 
+    @commands.command(usage='maps {veto|random}',
+                      brief=Utils.trans('command-maps-brief'))
+    async def maps(self, ctx, *args):
+        """"""
+        db_lobby = await self.ensure_lobby(ctx.channel)
+        curr_method = db_lobby.map_method
+        valid_methods = ['veto', 'random']
+
+        try:
+            new_method = args[0].lower()
+            if new_method not in valid_methods:
+                raise ValueError
+        except (IndexError, ValueError):
+            raise commands.CommandInvokeError(Utils.trans(
+                'invalid-usage', G5.bot.command_prefix[0], ctx.command.usage))
+
+        if curr_method == new_method:
+            raise commands.CommandInvokeError(Utils.trans('maps-method-already', curr_method))
+
+        await db_lobby.update({'map_method': f"'{new_method}'"})
+
+        title = Utils.trans('set-maps-method', new_method)
+        embed = G5.bot.embed_template(title=title)
+        message = await ctx.send(embed=embed)
+        Utils.clear_messages([message, ctx.message])
+
     @commands.command(usage='series {bo1|bo2|bo3|bo5}',
                       brief=Utils.trans('command-series-brief'))
     async def series(self, ctx, *args):
