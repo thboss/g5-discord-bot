@@ -159,10 +159,11 @@ class PickTeams(discord.Message):
 
         if captain_method == 'rank':
             users = await DB.User.get_users(self.users_left, db_guild.guild)
-            leaderboard = await API.PlayerStats.get_leaderboard(users)
+            leaderboard = await API.PlayerStats.get_leaderboard(
+                users, pug=self.lobby.pug, season_id=self.lobby.season_id)
             users_dict = dict(zip(leaderboard, self.users_left))
             players = list(users_dict.keys())
-            players.sort(key=lambda x: x.elo)
+            players.sort(key=lambda x: x.rating)
 
             for team in self.teams:
                 player = [players.pop()]

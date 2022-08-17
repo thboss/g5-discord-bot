@@ -265,19 +265,20 @@ class MatchCog(commands.Cog):
         embed = G5.bot.embed_template(description=msg)
         await ctx.send(embed=embed)
 
-    async def autobalance_teams(self, db_guild, users):
+    async def autobalance_teams(self, db_guild, db_lobby, users):
         """ Balance teams based on players' avarage raitng. """
         # Get players and sort by average rating
         _users = await DB.User.get_users(users, db_guild.guild)
         try:
-            leaderboard = await API.PlayerStats.get_leaderboard(_users)
+            leaderboard = await API.PlayerStats.get_leaderboard(
+                _users, pug=db_lobby.pug, season_id=db_lobby.season_id)
         except Exception as e:
             G5.bot.logger.info(str(e))
             return self.randomize_teams(users)
 
         stats_dict = dict(zip(leaderboard, users))
         players = list(stats_dict.keys())
-        players.sort(key=lambda x: x.elo)
+        players.sort(key=lambda x: x.rating)
 
         # Balance teams
         team_size = len(players) // 2
@@ -289,7 +290,7 @@ class MatchCog(commands.Cog):
                 team2_users.append(players.pop())
             elif len(team2_users) >= team_size:
                 team1_users.append(players.pop())
-            elif sum(p.elo for p in team1_users) < sum(p.elo for p in team2_users):
+            elif sum(p.rating for p in team1_users) < sum(p.rating for p in team2_users):
                 team1_users.append(players.pop())
             else:
                 team2_users.append(players.pop())
@@ -359,7 +360,7 @@ class MatchCog(commands.Cog):
                 if db_lobby.team_method == 'captains' and len(users) > 3:
                     team1_users, team2_users = await self.draft_teams(db_guild, message, users, db_lobby)
                 elif db_lobby.team_method == 'autobalance' and len(users) > 3:
-                    team1_users, team2_users = await self.autobalance_teams(db_guild, users)
+                    team1_users, team2_users = await self.autobalance_teams(db_guild, db_lobby, users)
                 else:  # team_method is random
                     team1_users, team2_users = self.randomize_teams(users)
 
