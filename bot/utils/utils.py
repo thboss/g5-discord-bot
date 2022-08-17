@@ -126,9 +126,9 @@ class Utils:
             draw.text((73, 235+65*idx), str(p.name)[:18], font=font)
             draw.text((340, 235+65*idx), str(p.kills), font=font)
             draw.text((500, 235+65*idx), str(p.deaths), font=font)
-            draw.text((660, 235+65*idx), str(p.total_matches), font=font)
-            draw.text((820, 235+65*idx), str(p.match_win), font=font)
-            draw.text((980, 235+65*idx), str(p.score), font=font)
+            draw.text((660, 235+65*idx), str(p.played), font=font)
+            draw.text((820, 235+65*idx), str(p.wins), font=font)
+            draw.text((980, 235+65*idx), str(p.rating), font=font)
 
         img.save(SAVE_IMG_DIR + '/leaderboard.png')
         return File(SAVE_IMG_DIR + '/leaderboard.png')
@@ -154,11 +154,11 @@ class Utils:
 
         draw.text((365, 226+109*0), align_text(f'{stats.hsp}%', 20), font=font)
         draw.text((365, 226+109*1),
-                  align_text(str(stats.total_matches), 20), font=font)
-        draw.text((365, 226+109*2), align_text(str(stats.match_win), 20), font=font)
+                  align_text(str(stats.played), 20), font=font)
+        draw.text((365, 226+109*2), align_text(str(stats.wins), 20), font=font)
         draw.text((365, 226+109*3),
                   align_text(f'{stats.win_percent}%', 20), font=font)
-        draw.text((365, 226+109*4), align_text(str(stats.score), 20), font=font)
+        draw.text((365, 226+109*4), align_text(str(stats.rating), 20), font=font)
 
         img.save(SAVE_IMG_DIR + '/statistics.png')
         return File(SAVE_IMG_DIR + '/statistics.png')
