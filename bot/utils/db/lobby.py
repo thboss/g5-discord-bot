@@ -24,6 +24,7 @@ class Lobby:
         pug,
         team1_id,
         team2_id,
+        autoready
     ):
         """"""
         self.id = lobby_id
@@ -41,6 +42,7 @@ class Lobby:
         self.pug = pug
         self.team1_id = team1_id
         self.team2_id = team2_id
+        self.autoready = autoready
 
     @classmethod
     def from_dict(cls, lobby_data: dict):
@@ -61,7 +63,8 @@ class Lobby:
             lobby_data['season_id'],
             lobby_data['pug'],
             lobby_data['team1_id'],
-            lobby_data['team2_id']
+            lobby_data['team2_id'],
+            lobby_data['autoready']
         )
 
     @staticmethod

@@ -216,6 +216,11 @@
     "do-not-have-team": "You do not have any team!",
     "captain-not-response": "Team's captain did not response your request in 1 hour!",
     "unlink-only-admins": "Only admins can force unlink users",
-    "bot-not-setup": "The bot didn't setup in this server, please use command `{}setup`"
+    "bot-not-setup": "The bot didn't setup in this server, please use command `{}setup`",
+    "command-autoready-brief": "Enable/Disable autoready for a lobby",
+    "autoready-already-enabled": "Auto ready is already enabled", 
+    "autoready-already-disabled": "Auto ready is already disabled",
+    "autoready-enabled-success": "Auto ready has successfully been enabled",
+    "autoready-disabled-success": "Auto ready has successfully been disabled"
   }
 }

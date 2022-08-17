@@ -417,6 +417,40 @@ class LobbyCog(commands.Cog):
         message = await ctx.send(embed=embed)
         Utils.clear_messages([message, ctx.message])
 
+    @commands.command(usage='autoready {enable|disable}',
+                      brief=Utils.trans('command-autoready-brief'))
+    async def autoready(self, ctx, *args):
+        """ Enable/Disable autoready for a lobby. """
+        db_lobby = await self.ensure_lobby(ctx.channel)
+        curr_value = db_lobby.autoready
+        valid_values = ['enable', 'disable']
+
+        try:
+            new_value = args[0].lower()
+            if new_value not in valid_values:
+                raise ValueError
+        except (IndexError, ValueError):
+            raise commands.CommandInvokeError(Utils.trans(
+                'invalid-usage', G5.bot.command_prefix[0], ctx.command.usage))
+
+        if curr_value and new_value == 'enable':
+            raise commands.CommandInvokeError(
+                Utils.trans('autoready-already-enabled'))
+        if not curr_value and new_value == 'disable':
+            raise commands.CommandInvokeError(
+                Utils.trans('autoready-already-disabled'))
+
+        await db_lobby.update({'autoready': True if new_value == 'enable' else False})
+
+        if new_value == 'enable':
+            title = Utils.trans('autoready-enabled-success')
+        else:
+            title = Utils.trans('autoready-disabled-success')
+            
+        embed = G5.bot.embed_template(title=title)
+        message = await ctx.send(embed=embed)
+        Utils.clear_messages([message, ctx.message])
+
     @commands.command(usage='region {none|region_code}',
                       brief=Utils.trans('command-region-brief'))
     async def region(self, ctx, *args):
@@ -603,33 +637,34 @@ class LobbyCog(commands.Cog):
             awaitables.append(user.remove_roles(db_guild.linked_role))
         await asyncio.gather(*awaitables, loop=G5.bot.loop, return_exceptions=True)
 
-        menu = ReadyUsers(message, users)
-        ready_users = await menu.ready_up()
-        unreadied = set(users) - ready_users
-        if unreadied:
-            await db_lobby.delete_users([user.id for user in unreadied])
-            awaitables = []
-            for user in users:
-                awaitables.append(user.add_roles(db_guild.linked_role))
-            for user in unreadied:
-                awaitables.append(user.move_to(db_guild.prematch_channel))
-            if not db_lobby.pug:
-                db_team1 = await DB.Team.get_team_by_id(db_lobby.team1_id)
-                db_team2 = await DB.Team.get_team_by_id(db_lobby.team2_id)
-                if db_team1:
-                    team1_users = await db_team1.get_users()
-                    if len(set(team1_users) & set(unreadied)) < db_lobby.capacity / 2:
-                        awaitables.append(db_lobby.lobby_channel.set_permissions(
-                            db_team1.role, connect=True))
-                if db_team2:
-                    team2_users = await db_team2.get_users()
-                    if len(set(team2_users) & set(unreadied)) < db_lobby.capacity / 2:
-                        awaitables.append(db_lobby.lobby_channel.set_permissions(
-                            db_team2.role, connect=True))
+        if not db_lobby.autoready:
+            menu = ReadyUsers(message, users)
+            ready_users = await menu.ready_up()
+            unreadied = set(users) - ready_users
+            if unreadied:
+                await db_lobby.delete_users([user.id for user in unreadied])
+                awaitables = []
+                for user in users:
+                    awaitables.append(user.add_roles(db_guild.linked_role))
+                for user in unreadied:
+                    awaitables.append(user.move_to(db_guild.prematch_channel))
+                if not db_lobby.pug:
+                    db_team1 = await DB.Team.get_team_by_id(db_lobby.team1_id)
+                    db_team2 = await DB.Team.get_team_by_id(db_lobby.team2_id)
+                    if db_team1:
+                        team1_users = await db_team1.get_users()
+                        if len(set(team1_users) & set(unreadied)) < db_lobby.capacity / 2:
+                            awaitables.append(db_lobby.lobby_channel.set_permissions(
+                                db_team1.role, connect=True))
+                    if db_team2:
+                        team2_users = await db_team2.get_users()
+                        if len(set(team2_users) & set(unreadied)) < db_lobby.capacity / 2:
+                            awaitables.append(db_lobby.lobby_channel.set_permissions(
+                                db_team2.role, connect=True))
 
-            await asyncio.gather(*awaitables, loop=G5.bot.loop, return_exceptions=True)
-            await self.update_queue_msg(db_lobby)
-            return False
+                await asyncio.gather(*awaitables, loop=G5.bot.loop, return_exceptions=True)
+                await self.update_queue_msg(db_lobby)
+                return False
 
         await db_lobby.clear_users()
         prepare_match_channel = await db_guild.guild.create_voice_channel(name='Preparing match..', category=db_lobby.category)
