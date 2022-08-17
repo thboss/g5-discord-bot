@@ -78,7 +78,7 @@ class PlayerStats:
                 if resp.status >= 400:
                     raise Exception('Response: ' + resp_data['message'])
                 players = list(
-                    filter(lambda x: x['steam'] in db_steam_ids, resp_data))
+                    filter(lambda x: x['steam'] in db_steam_ids, resp_data['leaderboard']))
                 api_steam_ids = [player['steam'] for player in players]
 
                 for steam_id in db_steam_ids:
