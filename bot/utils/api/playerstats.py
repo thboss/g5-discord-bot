@@ -54,8 +54,8 @@ class PlayerStats:
                 resp_data = await resp.json()
                 if resp.status >= 400:
                     raise Exception('Response: ' + resp_data['message'])
-                resp_data["name"] = db_user.user.display_name
-                return cls(resp_data)
+                resp_data["playerstats"]["name"] = db_user.user.display_name
+                return cls(resp_data["playerstats"])
         except ContentTypeError:
             raise Exception(Utils.trans('invalid-api-key'))
         except (ClientConnectionError, TimeoutError):
