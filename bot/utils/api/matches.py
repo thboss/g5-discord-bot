@@ -138,8 +138,8 @@ class Matches:
             'players_per_team': total_players // 2,
             'min_players_to_ready': total_players // 2,
             'match_cvars': {
-                'g5_ranking_api_url': Config.api_url + '/',
-                'g5_ranking_season_id': season_id or '',
+                'sv_hibernate_when_empty': 0,
+                'get5_time_to_start': 300,
                 'get5_end_match_on_empty_server': 1
             }
         }
