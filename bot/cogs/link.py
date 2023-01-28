@@ -13,7 +13,7 @@ class LinkCog(commands.Cog):
     @commands.command(brief=Utils.trans('link-command-brief'),
                       usage='link <steam_id> {OPTIONAL flag_emoji}')
     @DB.Guild.is_guild_setup()
-    async def link(self, ctx, steam_id=None, flag='🇺🇸'):
+    async def link(self, ctx, steam_id=None, flag='🇻🇳'):
         """"""
         user = ctx.author
         db_guild = await DB.Guild.get_guild_by_id(ctx.guild.id)
