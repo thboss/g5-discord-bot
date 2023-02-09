@@ -140,6 +140,7 @@ class Matches:
             'match_cvars': {
                 'sv_hibernate_when_empty': 0,
                 'get5_time_to_start': 300,
+                'get5_check_auths': 1,
             }
         }
 
