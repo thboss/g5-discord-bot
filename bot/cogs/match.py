@@ -212,7 +212,7 @@ class MatchCog(commands.Cog):
                 curr_user.add_roles(db_guild.linked_role),
                 curr_user.move_to(db_guild.prematch_channel)
             ]
-            await asyncio.gather(*awaitables, loop=G5.bot.loop, return_exceptions=True)
+            await asyncio.gather(*awaitables, return_exceptions=True)
 
         title = Utils.trans('player-match-replaced',
                             curr_user.display_name, new_user.display_name, db_match.id)
@@ -548,7 +548,7 @@ class MatchCog(commands.Cog):
                 team2_channel.set_permissions(user, connect=True))
             awaitables.append(user.move_to(team2_channel))
 
-        await asyncio.gather(*awaitables, loop=G5.bot.loop, return_exceptions=True)
+        await asyncio.gather(*awaitables, return_exceptions=True)
         return match_catg, team1_channel, team2_channel
 
     async def finalize_match(self, db_match, db_guild, db_lobby):
@@ -572,7 +572,7 @@ class MatchCog(commands.Cog):
                 awaitables.append(db_lobby.lobby_channel.set_permissions(
                     team2.role, overwrite=None))
 
-        await asyncio.gather(*awaitables, loop=G5.bot.loop, return_exceptions=True)
+        await asyncio.gather(*awaitables, return_exceptions=True)
 
         for channel in [db_match.team1_channel, db_match.team2_channel, db_match.category]:
             try:

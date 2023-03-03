@@ -550,7 +550,7 @@ class LobbyCog(commands.Cog):
             awaitables.append(user.move_to(channel))
         if new_cap:
             awaitables.append(db_lobby.lobby_channel.edit(user_limit=new_cap))
-        await asyncio.gather(*awaitables, loop=G5.bot.loop, return_exceptions=True)
+        await asyncio.gather(*awaitables, return_exceptions=True)
 
         self.locked_lobby[db_lobby.id] = False
         await self.update_queue_msg(db_lobby, Utils.trans('queue-emptied'))
@@ -618,7 +618,7 @@ class LobbyCog(commands.Cog):
             DB.Team.get_user_team(user.id, db_lobby.guild.id),
             db_lobby.get_users(),
         ]
-        result = await asyncio.gather(*awaitables, loop=G5.bot.loop)
+        result = await asyncio.gather(*awaitables)
         db_user = result[0]
         db_match = result[1]
         db_team = result[2]
@@ -661,7 +661,7 @@ class LobbyCog(commands.Cog):
         awaitables = []
         for user in users:
             awaitables.append(user.remove_roles(db_guild.linked_role))
-        await asyncio.gather(*awaitables, loop=G5.bot.loop, return_exceptions=True)
+        await asyncio.gather(*awaitables, return_exceptions=True)
 
         if not db_lobby.autoready:
             menu = ReadyUsers(message, users)
@@ -688,7 +688,7 @@ class LobbyCog(commands.Cog):
                             awaitables.append(db_lobby.lobby_channel.set_permissions(
                                 db_team2.role, connect=True))
 
-                await asyncio.gather(*awaitables, loop=G5.bot.loop, return_exceptions=True)
+                await asyncio.gather(*awaitables, return_exceptions=True)
                 await self.update_queue_msg(db_lobby)
                 return False
 
@@ -696,7 +696,7 @@ class LobbyCog(commands.Cog):
         prepare_match_channel = await db_guild.guild.create_voice_channel(name='Preparing match..', category=db_lobby.category)
         for user in users:
             awaitables.append(user.move_to(prepare_match_channel))
-        await asyncio.gather(*awaitables, loop=G5.bot.loop, return_exceptions=True)
+        await asyncio.gather(*awaitables, return_exceptions=True)
         await message.delete()
 
         return prepare_match_channel
@@ -739,7 +739,7 @@ class LobbyCog(commands.Cog):
                     awaitables.append(db_lobby.lobby_channel.set_permissions(
                         db_team2.role, connect=True))
 
-        await asyncio.gather(*awaitables, loop=G5.bot.loop, return_exceptions=True)
+        await asyncio.gather(*awaitables, return_exceptions=True)
         try:
             await prepare_match_channel.delete()
         except:
@@ -829,8 +829,7 @@ class LobbyCog(commands.Cog):
                 awaitables.append(self.update_queue_msg(db_lobby))
 
         if awaitables:
-            asyncio.gather(*awaitables, loop=G5.bot.loop,
-                           return_exceptions=True)
+            asyncio.gather(*awaitables, return_exceptions=True)
 
     @ commands.Cog.listener()
     async def on_member_remove(self, user):

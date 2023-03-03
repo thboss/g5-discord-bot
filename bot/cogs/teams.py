@@ -414,8 +414,7 @@ class TeamCog(commands.Cog):
                 await db_team.update({'role': team_role.id})
 
         if awaitables:
-            asyncio.gather(*awaitables, loop=G5.bot.loop,
-                           return_exceptions=True)
+            asyncio.gather(*awaitables, return_exceptions=True)
 
     @commands.command(brief=Utils.trans('command-create-team-brief'),
                       usage='team-create <team_name>',

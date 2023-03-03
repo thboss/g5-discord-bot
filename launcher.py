@@ -11,10 +11,17 @@ import os
 
 load_dotenv()  # Load the environment variables in the local .env file
 
+
+def _get_loop():
+    """"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop
+
+
 db_connect_url = 'postgresql://{POSTGRESQL_USER}:{POSTGRESQL_PASSWORD}@{POSTGRESQL_HOST}:{POSTGRESQL_PORT}/{POSTGRESQL_DB}'
 db_connect_url = db_connect_url.format(**os.environ)
-loop = asyncio.get_event_loop()
-pool = loop.run_until_complete(asyncpg.create_pool(db_connect_url))
+pool = _get_loop().run_until_complete(asyncpg.create_pool(db_connect_url))
 logger = logging.getLogger('G5.db')
 
 

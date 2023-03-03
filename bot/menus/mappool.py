@@ -77,7 +77,7 @@ class MapPool(discord.Message):
 
         awaitables = [self.add_reaction(m.emoji)
                       for m in self.guild_maps]
-        await asyncio.gather(*awaitables, loop=G5.bot.loop)
+        await asyncio.gather(*awaitables)
         await self.add_reaction('✅')
         await self.add_reaction('❌')
 
