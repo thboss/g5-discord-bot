@@ -11,8 +11,7 @@ from discord import app_commands, Interaction, Embed
 from .helpers.db import db
 from .helpers.api import api
 from .helpers.config_reader import Config
-from .helpers.errors import CustomError
-from .helpers.errors import APIError
+from .helpers.errors import CustomError, APIError
 
 
 class G5Bot(commands.AutoShardedBot):
