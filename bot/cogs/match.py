@@ -32,6 +32,14 @@ class MatchCog(commands.Cog, name="Match"):
         embed = Embed(description=f"Match #{match_id} successfully canceled.")
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="restart-match", description="Restart a live match")
+    @app_commands.describe(match_id="Match ID")
+    async def restart_match(self, interaction: Interaction, match_id: int):
+        """"""
+        await api.restart_match(match_id)
+        embed = Embed(description=f"Match #{match_id} successfully restarted.")
+        await interaction.response.send_message(embed=embed)
+
     @app_commands.command(name="pause-match", description="Pause a live match")
     @app_commands.describe(match_id="Match ID")
     async def pause_match(self, interaction: Interaction, match_id: int):

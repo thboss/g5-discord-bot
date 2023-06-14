@@ -521,6 +521,31 @@ class APIManager:
             return True
 
     @check_connection
+    async def restart_match(self, match_id: int):
+        """
+        Sends an HTTP GET request to restart the match with the given ID.
+
+        Args:
+            match_id (int): The ID of the match to restart.
+
+        Returns:
+            bool: True if the match was successfully restarted.
+
+        Raises:
+            APIError: If there was an error with the API request or response.
+        """
+
+        url = f"/api/matches/{match_id}/restart"
+
+        async with self.session.get(url=url) as resp:
+            if "/steam/auth" in str(resp.url):
+                raise APIError("Invalid API key!")
+            if resp.status >= 400:
+                resp_data = await resp.json()
+                raise APIError(resp_data['message'])
+            return True
+
+    @check_connection
     async def pause_match(self, match_id: int):
         """
         Sends an HTTP GET request to pause a match with the given ID.
