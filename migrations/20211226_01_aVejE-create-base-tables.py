@@ -16,18 +16,16 @@ steps = [
         'DROP TYPE captain_method;'
     ),
     step(
-        'CREATE TYPE series_type AS ENUM(\'bo1\', \'bo2\', \'bo3\', \'bo5\');',
+        'CREATE TYPE series_type AS ENUM(\'bo1\', \'bo2\', \'bo3\');',
         'DROP TYPE series_type;'
     ),
     step(
         (
             'CREATE TABLE guilds(\n'
             '    id BIGSERIAL PRIMARY KEY,\n'
-            '    api_key VARCHAR(128) DEFAULT NULL,\n'
             '    linked_role BIGINT DEFAULT NULL,\n'
             '    prematch_channel BIGINT DEFAULT NULL,\n'
             '    category BIGINT DEFAULT NULL\n,'
-            '    leaders_channel BIGINT DEFAULT NULL,\n'
             '    results_channel BIGINT DEFAULT NULL\n'
             ');'
         ),
@@ -38,20 +36,15 @@ steps = [
             'CREATE TABLE lobbies(\n'
             '    id SERIAL PRIMARY KEY,\n'
             '    guild BIGINT DEFAULT NULL REFERENCES guilds (id) ON DELETE CASCADE,\n'
-            '    pug BOOL DEFAULT TRUE,\n'
-            '    private BOOL DEFAULT FALSE,\n'
             '    series_type series_type DEFAULT \'bo1\',\n'
             '    team_method team_method DEFAULT \'captains\',\n'
             '    captain_method captain_method DEFAULT \'volunteer\',\n'
             '    capacity SMALLINT DEFAULT 10,\n'
-            '    region VARCHAR(3) DEFAULT NULL,\n'
-            '    season_id SMALLINT NOT NULL DEFAULT 0,\n'
             '    category BIGINT DEFAULT NULL,\n'
             '    queue_channel BIGINT DEFAULT NULL,\n'
             '    lobby_channel BIGINT DEFAULT NULL,\n'
             '    last_message BIGINT DEFAULT NULL,\n'
-            '    team1_id INTEGER DEFAULT NULL,\n'
-            '    team2_id INTEGER DEFAULT NULL\n'
+            '    autoready BOOL DEFAULT FALSE\n'
             ');'
         ),
         'DROP TABLE lobbies;'

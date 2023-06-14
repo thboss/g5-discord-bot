@@ -1,42 +1,40 @@
-# help.py
-
+import discord
 from discord.ext import commands
 
-from ..utils import Utils
-from ..resources import G5
 
-AUTHOR = 'TheBO$$#2967'
-AUTHOR_ICON_URL = 'https://images.discordapp.net/avatars/389758324691959819/8888d88c6a8ca46de247882c8c0dcff2.png?size=64'
+class Help(commands.Cog):
 
+    def __init__(self, bot):
+        self.bot = bot
 
-class HelpCog(commands.Cog):
-    """ Handles everything related to the help menu. """
+    @discord.app_commands.command(name='help', description='List of all commands')
+    @commands.cooldown(1, 2, commands.BucketType.user)
+    async def help(self, interaction: discord.Interaction):
+        """"""
+        command_list = await self.bot.tree.fetch_commands()
+        command_dict = {}
+        for command in command_list:
+            command_dict[command.name] = command
 
-    def __init__(self):
-        """ Set attributes and remove default help command. """
-        G5.bot.remove_command('help')
+        cog_commands = {}
+        for cog in self.bot.cogs.values():
+            if cog.qualified_name in ["Logger", "Help"]:
+                continue
+            cog_commands[cog.qualified_name] = []
+            for command in cog.get_app_commands():
+                cog_commands[cog.qualified_name].append(command.name)
 
-    @commands.command(brief=Utils.trans('help-brief'))
-    async def help(self, ctx):
-        """ Generate and send help embed based on the bot's commands. """
-        description = "__**Basic Info:**__\n" \
-                      "_**G5** is a Discord bot to manage CS:GO matches on your own CS:GO servers_\n\n" \
-                      "__**Commands List:**__"
-        embed = G5.bot.embed_template(description=description)
-        prefix = G5.bot.command_prefix
-        prefix = prefix[0] if prefix is not str else prefix
-
-        for cog in G5.bot.cogs:  # Uset bot.cogs instead of bot.commands to control ordering in the help embed
-            for cmd in G5.bot.get_cog(cog).get_commands():
-                if cmd.usage:  # Command has usage attribute set
-                    embed.add_field(
-                        name=f'**{prefix}{cmd.usage}**', value=f'_{cmd.brief}_', inline=False)
-                else:
-                    embed.add_field(
-                        name=f'**{prefix}{cmd.name}**', value=f'_{cmd.brief}_', inline=False)
-        embed.set_thumbnail(url=G5.bot.user.avatar_url_as(size=128))
+        embed = discord.Embed(title='Help', color=0x02b022)
+        embed.description = 'List of commands'
         embed.set_footer(
-            text=f'Kindly developed by {AUTHOR}',
-            icon_url=AUTHOR_ICON_URL
-        )
-        await ctx.message.reply(embed=embed)
+            text="Usage syntax: <required argument>, [optional argument]")
+
+        for category, commands in cog_commands.items():
+            embed.add_field(name=category, value=', '.join(
+                [command_dict[i].mention for i in commands]), inline=False)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+async def setup(bot):
+    await bot.add_cog(Help(bot))

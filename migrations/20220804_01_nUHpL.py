@@ -4,7 +4,7 @@ Drop not null in steam_id
 
 from yoyo import step
 
-__depends__ = {'20220602_01_67ISe'}
+__depends__ = {'20220524_01_DA8sh'}
 
 steps = [
     step(

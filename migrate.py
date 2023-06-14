@@ -1,16 +1,20 @@
-# migrate.py
-
-from dotenv import load_dotenv
-from os import environ
+import json
 import sys
+import os
 from yoyo import get_backend, read_migrations
+
+
+if not os.path.isfile(f"{os.path.realpath(os.path.dirname(__file__))}/config.json"):
+    sys.exit("'config.json' not found! Please add it and try again.")
+else:
+    with open(f"{os.path.realpath(os.path.dirname(__file__))}/config.json") as file:
+        config = json.load(file)
 
 
 def migrate(direction):
     """ Apply Yoyo migrations for a given PostgreSQL database. """
-    load_dotenv()
-    connect_url = 'postgresql://{POSTGRESQL_USER}:{POSTGRESQL_PASSWORD}@{POSTGRESQL_HOST}:{POSTGRESQL_PORT}/{POSTGRESQL_DB}'
-    backend = get_backend(connect_url.format(**environ))
+    db_connect_url = 'postgresql://{POSTGRESQL_USER}:{POSTGRESQL_PASSWORD}@{POSTGRESQL_HOST}:{POSTGRESQL_PORT}/{POSTGRESQL_DB}'
+    backend = get_backend(db_connect_url.format(**config))
     migrations = read_migrations('./migrations')
     print('Applying migrations:\n' +
           '\n'.join(migration.id for migration in migrations))
