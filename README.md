@@ -35,7 +35,7 @@ A Discord bot to manage CS:GO PUGs. Connects to [G5API](https://github.com/Phlex
 
 7. Apply the database migrations by running `python3 migrate.py up`.
 
-8. Run the launcher Python script by running, `python3 launcher.py`.
+8. Run the launcher Python script by running, `python3 run.py`.
 
 ## Thanks To
 
