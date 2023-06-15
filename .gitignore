@@ -1,0 +1,4 @@
+
+*.pyc
+bot.log
+config.json
