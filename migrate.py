@@ -13,8 +13,8 @@ else:
 
 def migrate(direction):
     """ Apply Yoyo migrations for a given PostgreSQL database. """
-    db_connect_url = 'postgresql://{POSTGRESQL_USER}:{POSTGRESQL_PASSWORD}@{POSTGRESQL_HOST}:{POSTGRESQL_PORT}/{POSTGRESQL_DB}'
-    backend = get_backend(db_connect_url.format(**config))
+    db_connect_url = 'postgresql://{user}:{password}@{host}:{port}/{database}'
+    backend = get_backend(db_connect_url.format(**config['db']))
     migrations = read_migrations('./migrations')
     print('Applying migrations:\n' +
           '\n'.join(migration.id for migration in migrations))
