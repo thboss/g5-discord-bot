@@ -222,11 +222,11 @@ class APIManager:
         users_model = await db.get_users(users)
         url = "/api/teams"
         data = {
-            'name': name,
+            'name': 'team_' + name,
             'public_team': 0,
             'auth_name': {
                 db_user.steam: {
-                    'name': 'test',
+                    'name': db_user.user.display_name,
                     'captain': index == 0,
                     'coach': False
                 } for index, db_user in enumerate(users_model)
