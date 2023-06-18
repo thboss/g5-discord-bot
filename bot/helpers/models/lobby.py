@@ -20,6 +20,7 @@ class LobbyModel:
         captain_method: Literal["random", "volunteer", "rank"],
         map_method: Literal["random", "veto"],
         series: Literal["bo1", "bo2", "bo3"],
+        game_mode: Literal["competitive", "wingman"],
         auto_ready: bool
     ):
         """"""
@@ -34,6 +35,7 @@ class LobbyModel:
         self.captain_method = captain_method
         self.map_method = map_method
         self.series = series
+        self.game_mode = game_mode
         self.auto_ready = auto_ready
 
     @classmethod
@@ -51,5 +53,6 @@ class LobbyModel:
             data['captain_method'],
             data['map_method'],
             data['series_type'],
+            data['game_mode'],
             data['autoready']
         )

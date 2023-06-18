@@ -447,7 +447,8 @@ class APIManager:
         team1_id: int,
         team2_id: int,
         str_maps: str,
-        total_players: int
+        total_players: int,
+        game_mode: Literal["competitive", "wingman"]
     ) -> int:
         """
         Sends an HTTP POST request to create a new match.
@@ -458,6 +459,7 @@ class APIManager:
             team2_id (int): The ID of the second team in the match.
             str_maps (str): A string containing the maps to be played in the match.
             total_players (int): The total number of players in the match.
+            game_mode (Literal["competitive", "wingman"]): The game mode to be played in the match.
 
         Returns:
             int: The ID of the newly created match.
@@ -484,6 +486,7 @@ class APIManager:
             'players_per_team': total_players // 2,
             'min_players_to_ready': total_players // 2,
             'match_cvars': {
+                'game_mode': 1 if game_mode == 'competitive' else 2,
                 'sv_hibernate_when_empty': 0,
                 'get5_time_to_start': 300,
             }

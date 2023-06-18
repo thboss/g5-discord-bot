@@ -240,7 +240,8 @@ class MatchCog(commands.Cog, name="Match"):
                 team1_id,
                 team2_id,
                 str_maps,
-                len(team1_users + team2_users)
+                len(team1_users + team2_users),
+                lobby_model.game_mode
             )
 
         except asyncio.TimeoutError:

@@ -51,6 +51,11 @@ SERIES_CHOICES = [
     app_commands.Choice(name="Bo3", value="bo3")
 ]
 
+GAME_MODE_CHOICES = [
+    app_commands.Choice(name="Competitive", value="competitive"),
+    app_commands.Choice(name="Wingman", value="wingman")
+]
+
 
 class JoinLobbyError(ValueError):
     """ Raised when a player can't join lobby for some reason. """
@@ -77,7 +82,8 @@ class LobbyCog(commands.Cog, name="Lobby"):
         teams_method="Teams selection method",
         captains_method="Captains selection method",
         map_method="Map selection method",
-        series="Number of maps per match"
+        series="Number of maps per match",
+        game_mode="Set game mode"
     )
     @app_commands.choices(
         capacity=CAPACITY_CHOICES,
@@ -85,6 +91,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         captains_method=CAPTAIN_SELECTION_CHOICES,
         map_method=MAP_SELECTION_CHOICES,
         series=SERIES_CHOICES,
+        game_mode=GAME_MODE_CHOICES,
         auto_ready=AUTO_READY_CHOICES
     )
     @commands.has_permissions(administrator=True)
@@ -96,6 +103,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         captains_method: app_commands.Choice[str],
         map_method: app_commands.Choice[str],
         series: app_commands.Choice[str],
+        game_mode: app_commands.Choice[str],
         auto_ready: app_commands.Choice[int]
     ):
         """ Create a new lobby. """
@@ -123,6 +131,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
             'map_method': map_method.value,
             'autoready': auto_ready.value,
             'series_type': series.value,
+            'game_mode': game_mode.value,
             'category': category.id,
             'queue_channel': text_channel.id,
             'lobby_channel': voice_channel.id
