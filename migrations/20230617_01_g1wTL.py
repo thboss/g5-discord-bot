@@ -14,7 +14,7 @@ steps = [
     step(
         (
             'ALTER TABLE lobbies\n'
-            '    ADD COULUMN map_method map_method DEFAULT \'veto\'\n'
+            '    ADD COLUMN map_method map_method DEFAULT \'veto\'\n'
             ';'
         )
     )
