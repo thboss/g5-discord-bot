@@ -16,8 +16,16 @@ steps = [
         'DROP TYPE captain_method;'
     ),
     step(
+        'CREATE TYPE map_method AS ENUM(\'veto\', \'random\');',
+        'DROP TYPE map_method;'
+    ),
+    step(
         'CREATE TYPE series_type AS ENUM(\'bo1\', \'bo2\', \'bo3\');',
         'DROP TYPE series_type;'
+    ),
+    step(
+        'CREATE TYPE game_mode AS ENUM(\'competitive\', \'wingman\');',
+        'DROP TYPE game_mode;'
     ),
     step(
         (
@@ -38,7 +46,9 @@ steps = [
             '    guild BIGINT DEFAULT NULL REFERENCES guilds (id) ON DELETE CASCADE,\n'
             '    series_type series_type DEFAULT \'bo1\',\n'
             '    team_method team_method DEFAULT \'captains\',\n'
+            '    map_method map_method DEFAULT \'veto\',\n'
             '    captain_method captain_method DEFAULT \'volunteer\',\n'
+            '    game_mode game_mode DEFAULT \'competitive\',\n'
             '    capacity SMALLINT DEFAULT 10,\n'
             '    category BIGINT DEFAULT NULL,\n'
             '    queue_channel BIGINT DEFAULT NULL,\n'
@@ -70,8 +80,7 @@ steps = [
             'CREATE TABLE users('
             '    discord_id BIGSERIAL UNIQUE,\n'
             '    steam_id VARCHAR(18) UNIQUE,\n'
-            '    flag VARCHAR(3) DEFAULT NULL,\n'
-            '    PRIMARY KEY (discord_id, steam_id)\n'
+            '    flag VARCHAR(3) DEFAULT NULL\n'
             ');'
         ),
         'DROP TABLE users;'
@@ -95,5 +104,36 @@ steps = [
             ');'
         ),
         'DROP TABLE match_users;'
+    ),
+    step(
+        (
+            'CREATE TABLE guild_maps(\n'
+            '    map_id SERIAL PRIMARY KEY,\n'
+            '    guild_id BIGINT REFERENCES guilds (id) ON DELETE CASCADE,\n'
+            '    display_name VARCHAR(65) DEFAULT NULL,\n'
+            '    dev_name VARCHAR(65) DEFAULT NULL\n'
+            ');'
+        ),
+        'DROP TABLE guild_maps;'
+    ),
+    step(
+        (
+            'CREATE TABLE lobby_maps(\n'
+            '    map_id INTEGER REFERENCES guild_maps (map_id) ON DELETE CASCADE,\n'
+            '    lobby_id INTEGER REFERENCES lobbies (id) ON DELETE CASCADE,\n'
+            '    CONSTRAINT lobby_maps_pkey PRIMARY KEY (lobby_id, map_id)\n'
+            ');'
+        ),
+        'DROP TABLE lobby_maps;'
+    ),
+    step(
+        (
+            'CREATE TABLE lobby_cvars(\n'
+            '    name VARCHAR(128) NOT NULL,\n'
+            '    value VARCHAR(256) NOT NULL,\n'
+            '    lobby_id INTEGER REFERENCES lobbies (id) ON DELETE CASCADE\n'
+            ');'
+        ),
+        'DROP TABLE lobby_cvars;'
     )
 ]

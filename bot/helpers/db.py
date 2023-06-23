@@ -276,16 +276,15 @@ class DBManager:
         sql = f"DELETE FROM queued_users WHERE lobby_id = $1;"
         await self.query(sql, lobby_id)
 
-    async def get_lobby_maps(self, lobby_id: int, guild: discord.Guild) -> List[MapModel]:
+    async def get_lobby_maps(self, lobby_id: int) -> List[MapModel]:
         """"""
-        sql = "SELECT gm.*, lm.lobby_id\n" \
+        sql = "SELECT gm.*\n" \
             "FROM lobby_maps lm\n" \
             "JOIN guild_maps gm\n" \
-            "   ON lm.emoji_id = gm.emoji_id\n" \
+            "   ON lm.map_id = gm.map_id\n" \
             "WHERE lobby_id = $1;"
         maps_data = await self.query(sql, lobby_id)
-        maps = [MapModel.from_dict(data, guild) for data in maps_data]
-        return [m for m in maps if m.emoji]
+        return [MapModel.from_dict(data) for data in maps_data]
 
     async def clear_lobby_maps(self, lobby_id: int) -> None:
         """"""
@@ -294,30 +293,26 @@ class DBManager:
 
     async def insert_lobby_maps(self, lobby_id: int, maps: List[MapModel]) -> None:
         """"""
-        emojis = [m.emoji for m in maps]
-        emoji_ids = [e.id for e in emojis]
         values = f", ".join(
-            f"({lobby_id}, {emoji_id})" for emoji_id in emoji_ids)
-        sql = f"INSERT INTO lobby_maps VALUES {values};"
+            f"({lobby_id}, {m.map_id})" for m in maps)
+        sql = f"INSERT INTO lobby_maps (lobby_id, map_id) VALUES {values};"
         await self.query(sql)
 
     async def update_lobby_maps(self, lobby_id: int, new_maps: List[MapModel], existing_maps: List[MapModel]) -> None:
         """"""
-        existing_emojis = [m.emoji for m in existing_maps]
-        new_emojis = [m.emoji for m in new_maps]
-        existing_emoji_ids = [emoji.id for emoji in existing_emojis]
-        new_emoji_ids = [emoji.id for emoji in new_emojis]
-        delete_emoji_ids = list(set(existing_emoji_ids) - set(new_emoji_ids))
-        insert_emoji_ids = list(set(new_emoji_ids) - set(existing_emoji_ids))
+        existing_map_ids = [m.map_id for m in existing_maps]
+        new_map_ids = [m.map_id for m in new_maps]
+        delete_map_ids = list(set(existing_map_ids) - set(new_map_ids))
+        insert_map_ids = list(set(new_map_ids) - set(existing_map_ids))
 
-        if delete_emoji_ids:
-            delete_sql = "DELETE FROM lobby_maps WHERE lobby_id = $1 AND emoji_id = ANY($2);"
-            await self.query(delete_sql, lobby_id, delete_emoji_ids)
+        if delete_map_ids:
+            delete_sql = "DELETE FROM lobby_maps WHERE lobby_id = $1 AND map_id = ANY($2);"
+            await self.query(delete_sql, lobby_id, delete_map_ids)
 
-        if insert_emoji_ids:
+        if insert_map_ids:
             values = ", ".join(
-                f"({lobby_id}, {emoji_id})" for emoji_id in insert_emoji_ids)
-            insert_sql = f"INSERT INTO lobby_maps VALUES {values};"
+                f"({lobby_id}, {map_id})" for map_id in insert_map_ids)
+            insert_sql = f"INSERT INTO lobby_maps (lobby_id, map_id) VALUES {values};"
             await self.query(insert_sql)
 
     async def get_lobby_cvars(self, lobby_id: int) -> dict:
@@ -364,93 +359,57 @@ class DBManager:
         sql = "SELECT * FROM guild_maps\n" \
             f"    WHERE guild_id = $1;"
         maps_data = await self.query(sql, guild.id)
-        guild_maps = [MapModel.from_dict(map_data, guild)
-                      for map_data in maps_data]
-        exist_maps = [m for m in guild_maps if m.emoji]
-
-        if len(guild_maps) != len(exist_maps):
-            exist_emojis_ids = ','.join([f'{m.emoji.id}' for m in exist_maps])
-            sql = f"DELETE FROM guild_maps\n" \
-                f"    WHERE guild_id = $1 AND emoji_id NOT IN ({exist_emojis_ids});"
-            await self.query(sql, guild.id)
-
-        return exist_maps
+        return [MapModel.from_dict(map_data) for map_data in maps_data]
 
     async def insert_guild_maps(self, guild: discord.Guild, maps: List[MapModel]) -> None:
         """"""
         values = f", ".join(
-            f"('{m.display_name}', '{m.dev_name}', {guild.id}, {m.emoji.id})" for m in maps)
-        sql = "INSERT INTO guild_maps (display_name, dev_name, guild_id, emoji_id) \n" \
+            f"('{m.display_name}', '{m.dev_name}', {guild.id})" for m in maps)
+        sql = "INSERT INTO guild_maps (display_name, dev_name, guild_id) \n" \
             f"VALUES {values};"
         await self.query(sql)
 
     async def delete_guild_maps(self, guild: discord.Guild, maps: List[MapModel]):
         """"""
-        maps_str = ','.join([f"'{m.dev_name}'" for m in maps])
-        sql = f"DELETE FROM guild_maps WHERE dev_name IN ({maps_str}) AND guild_id = $1;"
+        maps_dev_names = ','.join([f"'{m.dev_name}'" for m in maps])
+        sql = f"DELETE FROM guild_maps WHERE dev_name IN ({maps_dev_names}) AND guild_id = $1;"
         await self.query(sql, guild.id)
 
-    async def create_custom_guild_map(self, guild: discord.Guild, display_name: str, emoji: discord.Emoji) -> bool:
+    async def create_custom_guild_map(self, guild: discord.Guild, display_name: str, dev_name: str) -> bool:
         """"""
-        exist_maps = await self.get_guild_maps(guild)
-        new_maps = [MapModel(
-            display_name,
-            emoji.name,
-            guild,
-            emoji,
-            f'<:{emoji.name}:{emoji.id}>'
-        )]
+        existing_maps = await self.get_guild_maps(guild)
+        for m in existing_maps:
+            if m.dev_name == dev_name:
+                return False
 
-        new_maps = [m for m in new_maps if m not in exist_maps]
-        if new_maps:
-            await self.delete_guild_maps(guild, new_maps)
-            await self.insert_guild_maps(guild, new_maps)
-            return True
-        return False
+        await self.insert_guild_maps(guild, [MapModel(
+            display_name,
+            dev_name
+        )])
+        return True
 
     async def create_default_guild_maps(self, guild: discord.Guild) -> None:
-        """ Upload custom map emojis to guilds. """
-        icons_dic = 'assets/maps/icons/'
-        icons = os.listdir(icons_dic)
-        guild_emojis_str = [e.name for e in guild.emojis]
-        exist_maps = await self.get_guild_maps(guild)
-        exist_maps_emojis = [m.emoji for m in exist_maps]
-        new_maps = []
+        """"""
+        existing_maps = await self.get_guild_maps(guild)
+        default_maps_dict = {
+            'de_dust2': 'Dust II',
+            'de_inverno': 'Inverno',
+            'de_vertigo': 'Vertigo',
+            'de_overpass': 'Overpass',
+            'de_mirage': 'Mirage',
+            'de_nuke': 'Nuke',
+            'de_train': 'Train',
+            'de_ancient': 'Ancient',
+            'de_cache': 'Cache',
+        }
+        default_maps = [MapModel(display_name, dev_name)
+                        for dev_name, display_name in default_maps_dict.items()]
 
-        for icon in icons:
-            if icon.endswith('.png') and os.stat(icons_dic + icon).st_size < 256000:
-                display_name = icon.split('-')[0]
-                dev_name = icon.split('-')[1].split('.')[0]
-
-                if dev_name in guild_emojis_str:
-                    emoji = discord.utils.get(guild.emojis, name=dev_name)
-                else:
-                    with open(icons_dic + icon, 'rb') as image:
-                        try:
-                            emoji = await guild.create_custom_emoji(name=dev_name, image=image.read())
-                            self.logger.info(
-                                f'Emoji "{emoji.name}" has been successfully created in server "{guild.name}"')
-                        except discord.Forbidden:
-                            msg = 'Setup Failed: Bot does not have permission to create custom emojis in this server!'
-                            raise commands.CommandInvokeError(msg)
-                        except discord.HTTPException as e:
-                            msg = f'Setup Failed: {e.text}'
-                            raise commands.CommandInvokeError(msg)
-                        except Exception as e:
-                            msg = f'Exception {e} occurred on creating custom emoji for icon "{dev_name}"'
-                            raise commands.CommandInvokeError(msg)
-
-                if emoji not in exist_maps_emojis:
-                    new_maps.append(MapModel(
-                        display_name,
-                        dev_name,
-                        guild,
-                        emoji,
-                        f'<:{dev_name}:{emoji.id}>'
-                    ))
+        existing_map_dev_names = [m.dev_name for m in existing_maps]
+        new_maps = [
+            m for m in default_maps if m.dev_name not in existing_map_dev_names]
 
         if new_maps:
-            await self.delete_guild_maps(guild, new_maps)
             await self.insert_guild_maps(guild, new_maps)
 
 

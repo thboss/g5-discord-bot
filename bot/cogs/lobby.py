@@ -110,6 +110,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         guild = interaction.guild
         guild_model = await db.get_guild_by_id(guild.id, self.bot)
         await self.validate_server_requirements(guild_model)
+        guild_model = await db.get_guild_by_id(guild.id, self.bot)
         category = await guild.create_category(name="Lobby")
         text_channel = await guild.create_text_channel(category=category, name='Queue')
         voice_channel = await guild.create_voice_channel(
@@ -207,9 +208,22 @@ class LobbyCog(commands.Cog, name="Lobby"):
             raise CustomError("This lobby was not created in this server.")
 
         guild_maps = await db.get_guild_maps(guild)
-        lobby_maps = await db.get_lobby_maps(lobby_id, guild)
+        lobby_maps = await db.get_lobby_maps(lobby_id)
         mpool_menu = MapPoolView(lobby_model.id, user, guild_maps, lobby_maps)
         await mpool_menu.start_mpool(interaction)
+
+    @app_commands.command(
+        name='add-custom-map',
+        description='Add a custom map'
+    )
+    @app_commands.describe(display_name='Didsplay Name',
+                           dev_name='Map name in CS:GO')
+    @commands.has_permissions(administrator=True)
+    async def add_custom_map(self, interaction: Interaction, display_name: str, dev_name: str):
+        """"""
+        map_added = await db.create_custom_guild_map(interaction.guild, display_name, dev_name)
+        msg = 'Map added successfully' if map_added else 'Map already exists'
+        await interaction.response.send_message(embed=Embed(description=msg))
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, user: Member, before: VoiceState, after: VoiceState):
@@ -329,21 +343,30 @@ class LobbyCog(commands.Cog, name="Lobby"):
             await db.update_lobby_data(lobby_model.id, {'last_message': queue_message.id})
 
         embed = self._embed_queue(
-            title, lobby_model.id, lobby_model.capacity, queued_users)
+            title, lobby_model, queued_users)
         await queue_message.edit(embed=embed)
 
-    def _embed_queue(self, title: str, lobby_id: int, capacity: int, queued_users: List[Member]):
+    def _embed_queue(self, title: str, lobby_model: LobbyModel, queued_users: List[Member]):
         """"""
         embed = Embed(title=title)
+
+        info_str = f"Game mode: *{lobby_model.game_mode.capitalize()}*\n" \
+                   f"Teams method: *{lobby_model.team_method.capitalize()}*\n" \
+                   f"Captains method: *{lobby_model.captain_method.capitalize()}*\n" \
+                   f"Maps method: *{lobby_model.map_method.capitalize()}*\n" \
+                   f"Series: *{lobby_model.series.capitalize()}*\n" \
+                   f"Auto-ready: *{'ON' if lobby_model.auto_ready else 'OFF'}*"
+
         queued_players_str = "Lobby is empty" if not queued_users else ""
         for num, user in enumerate(queued_users, start=1):
             queued_players_str += f'{num}. {user.mention}\n'
 
+        embed.add_field(name="**__Settings__**", value=info_str, inline=False)
         embed.add_field(
-            name=f"Players `({len(queued_users)}/{capacity})`:",
+            name=f"**__Players__** `({len(queued_users)}/{lobby_model.capacity})`:",
             value=queued_players_str
         )
-        embed.set_author(name=f"Lobby #{lobby_id}")
+        embed.set_author(name=f"Lobby #{lobby_model.id}")
         return embed
 
     async def move_to_channel(self, channel: VoiceChannel, users: List[Member]):
