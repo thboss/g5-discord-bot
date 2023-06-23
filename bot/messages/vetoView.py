@@ -11,7 +11,7 @@ from bot.helpers.models import MapModel
 class MapButton(discord.ui.Button['VetoView']):
     def __init__(self, selected_map: MapModel):
         super().__init__(style=discord.ButtonStyle.secondary,
-                         label=selected_map.display_name, emoji=selected_map.emoji)
+                         label=selected_map.display_name)
         self.selected_map = selected_map
 
     async def callback(self, interaction: discord.Interaction):
@@ -91,8 +91,8 @@ class VetoView(discord.ui.View):
         """"""
         if self.is_veto_done:
             desc = "**Picked Maps:**"
-            for index, map in enumerate(self.maps_pick):
-                desc += f"\n{index + 1}. {map.emoji} {map.display_name}"
+            for index, m in enumerate(self.maps_pick):
+                desc += f"\n{index + 1}. {m.display_name}"
         else:
             desc = f"Series: {self.series}\n\n" \
                 f"**Captain 1:** {self.captains[0].mention}\n" \

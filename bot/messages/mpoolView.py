@@ -10,7 +10,7 @@ from bot.helpers.db import db
 
 class MapButton(discord.ui.Button['MapPoolView']):
     def __init__(self, selected_map: MapModel, style: discord.ButtonStyle):
-        super().__init__(style=style, label=selected_map.display_name, emoji=selected_map.emoji)
+        super().__init__(style=style, label=selected_map.display_name)
         self.selected_map = selected_map
 
     async def callback(self, interaction: discord.Interaction):
@@ -65,7 +65,7 @@ class MapPoolView(discord.ui.View):
         self.future = None
 
         for m in guild_maps:
-            style = discord.ButtonStyle.primary if m in self.new_maps else discord.ButtonStyle.secondary
+            style = discord.ButtonStyle.primary if m in existing_maps else discord.ButtonStyle.secondary
             self.add_item(MapButton(m, style))
 
         self.add_item(SaveButton())
@@ -78,11 +78,10 @@ class MapPoolView(discord.ui.View):
         inactive_maps = ""
 
         for m in self.guild_maps:
-            map_info = f"{m.emoji} `{m.display_name}`\n"
             if m in self.new_maps:
-                active_maps += map_info
+                active_maps += f"`{m.display_name}`\n"
             else:
-                inactive_maps += map_info
+                inactive_maps += f"`{m.display_name}`\n"
 
         if not inactive_maps:
             inactive_maps = "*Empty*"

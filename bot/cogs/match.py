@@ -226,7 +226,7 @@ class MatchCog(commands.Cog, name="Match"):
             team1_id = await api.create_team(team1_name, team1_users)
             team2_id = await api.create_team(team2_name, team2_users)
 
-            mpool = await db.get_lobby_maps(lobby_model.id, lobby_model.guild)
+            mpool = await db.get_lobby_maps(lobby_model.id)
             if lobby_model.map_method == 'veto':
                 maps_list = await self.veto_map(message, lobby_model.series, mpool, team1_users[0], team2_users[0])
             else:
@@ -407,6 +407,10 @@ class MatchCog(commands.Cog, name="Match"):
         guild_model = await db.get_guild_by_id(match_model.guild.id, self.bot)
         lobby_model = await db.get_lobby_by_id(match_model.lobby_id, self.bot)
 
+        if not lobby_model:
+            await self.finalize_match(match_model, guild_model)
+            return
+
         try:
             message = await lobby_model.text_channel.fetch_message(match_model.message_id)
         except NotFound:
@@ -418,7 +422,7 @@ class MatchCog(commands.Cog, name="Match"):
             pass
 
         if not match_stats:
-            await self.finalize_match(match_model)
+            await self.finalize_match(match_model, guild_model)
             return
 
         try:
