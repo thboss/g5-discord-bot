@@ -6,7 +6,7 @@ import os
 import traceback
 
 from discord.ext import commands
-from discord import app_commands, Interaction, Embed
+from discord import app_commands, Interaction, Embed, Guild
 
 from .helpers.db import db
 from .helpers.api import api
@@ -86,7 +86,10 @@ class G5Bot(commands.AutoShardedBot):
     async def on_ready(self) -> None:
         #  Sync guilds' information with the database.
         if self.guilds:
-            await db.sync_guilds([guild.id for guild in self.guilds])
+            await db.sync_guilds([g.id for g in self.guilds])
+            for guild in self.guilds:
+                await db.create_default_guild_maps(guild)
+                await self.check_guild_requirements(guild)
 
         match_cog = self.get_cog("Match")
         if match_cog:
@@ -101,6 +104,18 @@ class G5Bot(commands.AutoShardedBot):
         if Config.sync_commands_globally:
             self.logger.info("Syncing commands globally...")
             await self.tree.sync()
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild) -> None:
+        """"""
+        await db.sync_guilds([g.id for g in self.guilds])
+        await db.create_default_guild_maps(guild)
+        await self.check_guild_requirements(guild)
+
+    @commands.Cog.listener()
+    async def on_guild_remove(self, guild) -> None:
+        """"""
+        await db.sync_guilds([g.id for g in self.guilds])
 
     async def close(self):
         """"""
@@ -125,3 +140,31 @@ class G5Bot(commands.AutoShardedBot):
                     exception = f"{type(e).__name__}: {e}"
                     self.logger.error(
                         f"Failed to load extension {extension}\n{exception}")
+
+    async def check_guild_requirements(self, guild: Guild) -> None:
+        """"""
+        guild_model = await db.get_guild_by_id(guild.id, self)
+        category = guild_model.category
+        linked_role = guild_model.linked_role
+        prematch_channel = guild_model.prematch_channel
+        results_channel = guild_model.results_channel
+
+        if any(x is None for x in [category, linked_role, prematch_channel, results_channel]):
+            if not category:
+                category = await guild.create_category_channel('G5')
+            if not linked_role:
+                linked_role = await guild.create_role(name='Linked')
+            if not prematch_channel:
+                prematch_channel = await guild.create_voice_channel(category=category, name='Pre-Match')
+            if not results_channel:
+                results_channel = await guild.create_text_channel(category=category, name='Results')
+                await results_channel.set_permissions(guild.self_role, send_messages=True)
+                await results_channel.set_permissions(guild.default_role, send_messages=False)
+
+            dict_data = {
+                'category': category.id,
+                'linked_role': linked_role.id,
+                'prematch_channel': prematch_channel.id,
+                'results_channel': results_channel.id
+            }
+            await db.update_guild_data(guild.id, dict_data)

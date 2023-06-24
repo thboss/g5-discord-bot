@@ -109,8 +109,6 @@ class LobbyCog(commands.Cog, name="Lobby"):
         """ Create a new lobby. """
         guild = interaction.guild
         guild_model = await db.get_guild_by_id(guild.id, self.bot)
-        await self.validate_server_requirements(guild_model)
-        guild_model = await db.get_guild_by_id(guild.id, self.bot)
         category = await guild.create_category(name="Lobby")
         text_channel = await guild.create_text_channel(category=category, name='Queue')
         voice_channel = await guild.create_voice_channel(
@@ -378,36 +376,6 @@ class LobbyCog(commands.Cog, name="Lobby"):
                 self.bot.logger.warning(
                     f"Unable to move user \"{user.display_name}\" to voice channel \"{channel.name}\": {e.text}")
                 pass
-
-    async def validate_server_requirements(self, guild_model: GuildModel) -> None:
-        """"""
-        guild = guild_model.guild
-        category = guild_model.category
-        linked_role = guild_model.linked_role
-        prematch_channel = guild_model.prematch_channel
-        results_channel = guild_model.results_channel
-
-        if any(x is None for x in [category, linked_role, prematch_channel, results_channel]):
-            if not category:
-                category = await guild.create_category_channel('G5')
-            if not linked_role:
-                linked_role = await guild.create_role(name='Linked')
-            if not prematch_channel:
-                prematch_channel = await guild.create_voice_channel(category=category, name='Pre-Match')
-            if not results_channel:
-                results_channel = await guild.create_text_channel(category=category, name='Results')
-                await results_channel.set_permissions(guild.self_role, send_messages=True)
-                await results_channel.set_permissions(guild.default_role, send_messages=False)
-
-            dict_data = {
-                'category': category.id,
-                'linked_role': linked_role.id,
-                'prematch_channel': prematch_channel.id,
-                'results_channel': results_channel.id
-            }
-            await db.update_guild_data(guild.id, dict_data)
-
-        await db.create_default_guild_maps(guild)
 
 
 async def setup(bot: G5Bot):
