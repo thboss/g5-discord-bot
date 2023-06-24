@@ -393,7 +393,7 @@ class DBManager:
         existing_maps = await self.get_guild_maps(guild)
         default_maps_dict = {
             'de_dust2': 'Dust II',
-            'de_inverno': 'Inverno',
+            'de_inferno': 'Inferno',
             'de_vertigo': 'Vertigo',
             'de_overpass': 'Overpass',
             'de_mirage': 'Mirage',
