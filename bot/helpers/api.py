@@ -198,7 +198,7 @@ class APIManager:
             loop=loop,
             headers={"user-api": Config.api_key},
             json_serialize=lambda x: json.dumps(x, ensure_ascii=False),
-            timeout=aiohttp.ClientTimeout(total=5),
+            timeout=aiohttp.ClientTimeout(total=30),
             trace_configs=[TRACE_CONFIG]
         )
 
@@ -475,6 +475,7 @@ class APIManager:
             'team1_id': team1_id,
             'team2_id': team2_id,
             'title': '[PUG] Map {MAPNUMBER} of {MAXMAPS}',
+            'wingman': game_mode == 'wingman',
             'is_pug': True,
             'start_time': datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
             'ignore_server': 0,
@@ -486,7 +487,6 @@ class APIManager:
             'players_per_team': total_players // 2,
             'min_players_to_ready': total_players // 2,
             'match_cvars': {
-                'game_mode': 1 if game_mode == 'competitive' else 2,
                 'sv_hibernate_when_empty': 0,
                 'get5_time_to_start': 300,
             }
