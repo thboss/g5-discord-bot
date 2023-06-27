@@ -8,7 +8,7 @@ from discord.ext import commands
 from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPException, VoiceChannel
 
 from bot.helpers.db import db
-from bot.helpers.models import GuildModel, LobbyModel
+from bot.helpers.models import LobbyModel
 from bot.helpers.errors import CustomError
 from bot.messages import ReadyView, MapPoolView
 from bot.bot import G5Bot
@@ -94,7 +94,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         game_mode=GAME_MODE_CHOICES,
         auto_ready=AUTO_READY_CHOICES
     )
-    @commands.has_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
     async def create_lobby(
         self,
         interaction: Interaction,
@@ -153,7 +153,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         description='Remove the provided lobby.'
     )
     @app_commands.describe(lobby_id="Lobby ID.")
-    @commands.has_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
     async def remove_lobby(self, interaction: Interaction, lobby_id: int):
         """"""
         guild = interaction.guild
@@ -193,7 +193,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         description='Modify map pool.'
     )
     @app_commands.describe(lobby_id="Lobby ID.")
-    @commands.has_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
     async def mpool(self, interaction: Interaction, lobby_id: int):
         """"""
         guild = interaction.guild
@@ -216,7 +216,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
     )
     @app_commands.describe(display_name='Didsplay Name',
                            dev_name='Map name in CS:GO')
-    @commands.has_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
     async def add_custom_map(self, interaction: Interaction, display_name: str, dev_name: str):
         """"""
         map_added = await db.create_custom_guild_map(interaction.guild, display_name, dev_name)

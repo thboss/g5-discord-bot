@@ -26,6 +26,7 @@ class MatchCog(commands.Cog, name="Match"):
 
     @app_commands.command(name="cancel-match", description="Cancel a live match")
     @app_commands.describe(match_id="Match ID")
+    @app_commands.checks.has_permissions(administrator=True)
     async def cancel_match(self, interaction: Interaction, match_id: int):
         """"""
         await api.cancel_match(match_id)
@@ -34,6 +35,7 @@ class MatchCog(commands.Cog, name="Match"):
 
     @app_commands.command(name="restart-match", description="Restart a live match")
     @app_commands.describe(match_id="Match ID")
+    @app_commands.checks.has_permissions(administrator=True)
     async def restart_match(self, interaction: Interaction, match_id: int):
         """"""
         await api.restart_match(match_id)
@@ -42,6 +44,7 @@ class MatchCog(commands.Cog, name="Match"):
 
     @app_commands.command(name="pause-match", description="Pause a live match")
     @app_commands.describe(match_id="Match ID")
+    @app_commands.checks.has_permissions(administrator=True)
     async def pause_match(self, interaction: Interaction, match_id: int):
         """"""
         await api.pause_match(match_id)
@@ -50,6 +53,7 @@ class MatchCog(commands.Cog, name="Match"):
 
     @app_commands.command(name="unpause-match", description="Unpause a live match")
     @app_commands.describe(match_id="Match ID")
+    @app_commands.checks.has_permissions(administrator=True)
     async def unpause_match(self, interaction: Interaction, match_id: int):
         """"""
         await api.unpause_match(match_id)
@@ -58,6 +62,7 @@ class MatchCog(commands.Cog, name="Match"):
 
     @app_commands.command(name="add-match-player", description="Add player to a live match")
     @app_commands.describe(match_id="Match ID", user="User to add them to the match", team="The team where player will be added")
+    @app_commands.checks.has_permissions(administrator=True)
     async def add_match_player(self, interaction: Interaction, match_id: int, user: Member, team: Literal["team1", "team2", "spec"]):
         """"""
         match_model = await db.get_match_by_id(match_id, self.bot)
@@ -95,6 +100,7 @@ class MatchCog(commands.Cog, name="Match"):
 
     @app_commands.command(name="remove-match-player", description="Remove player from a live match")
     @app_commands.describe(match_id="Match ID", user="User to remove from the match")
+    @app_commands.checks.has_permissions(administrator=True)
     async def remove_match_player(self, interaction: Interaction, match_id: int, user: Member):
         """"""
         match_model = await db.get_match_by_id(match_id, self.bot)

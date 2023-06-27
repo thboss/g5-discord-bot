@@ -27,7 +27,7 @@ class G5Bot(commands.AutoShardedBot):
 
     async def on_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         """ Executed every time a normal valid command catches an error. """
-        if isinstance(error, commands.CommandOnCooldown):
+        if isinstance(error, app_commands.CommandOnCooldown):
             minutes, seconds = divmod(error.retry_after, 60)
             hours, minutes = divmod(minutes, 60)
             hours = hours % 24
@@ -39,7 +39,7 @@ class G5Bot(commands.AutoShardedBot):
         elif isinstance(error, (CustomError, APIError)):
             embed = Embed(description=error.message, color=0xE02B2B)
             await interaction.response.send_message(embed=embed, ephemeral=True)
-        elif isinstance(error, commands.MissingPermissions):
+        elif isinstance(error, app_commands.MissingPermissions):
             embed = Embed(
                 description="You are missing the permission(s) `"
                 + ", ".join(error.missing_permissions)
@@ -47,24 +47,12 @@ class G5Bot(commands.AutoShardedBot):
                 color=0xE02B2B,
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
-        elif isinstance(error, commands.BotMissingPermissions):
+        elif isinstance(error, app_commands.BotMissingPermissions):
             embed = Embed(
                 description="I am missing the permission(s) `"
                 + ", ".join(error.missing_permissions)
                 + "` to fully perform this command!",
                 color=0xE02B2B,
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        elif isinstance(error, commands.MissingRequiredArgument):
-            embed = Embed(
-                title="Invalid Usage!",
-                description=str(error),
-                color=0xE02B2B,
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        elif isinstance(error, commands.CommandNotFound):
-            embed = Embed(
-                description=f"Command **`{interaction.command.name}`** is not valid!"
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         else:
