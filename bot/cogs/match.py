@@ -361,45 +361,46 @@ class MatchCog(commands.Cog, name="Match"):
             category=match_catg
         )
 
-        awaitables = [
-            team1_channel.set_permissions(
-                guild_model.guild.self_role, connect=True),
-            team2_channel.set_permissions(
-                guild_model.guild.self_role, connect=True),
-            team1_channel.set_permissions(
-                guild_model.guild.default_role, connect=False, read_messages=True),
-            team2_channel.set_permissions(
-                guild_model.guild.default_role, connect=False, read_messages=True)
-        ]
+        await team1_channel.set_permissions(guild_model.guild.self_role, connect=True)
+        await team2_channel.set_permissions(guild_model.guild.self_role, connect=True)
+        await team1_channel.set_permissions(guild_model.guild.default_role, connect=False, read_messages=True)
+        await team2_channel.set_permissions(guild_model.guild.default_role, connect=False, read_messages=True)
 
         for user in team1_users:
-            awaitables.append(
-                team1_channel.set_permissions(user, connect=True))
-            awaitables.append(user.move_to(team1_channel))
+            try:
+                await team1_channel.set_permissions(user, connect=True)
+                await user.move_to(team1_channel)
+            except Exception as e:
+                pass
 
         for user in team2_users:
-            awaitables.append(
-                team2_channel.set_permissions(user, connect=True))
-            awaitables.append(user.move_to(team2_channel))
+            try:
+                await team2_channel.set_permissions(user, connect=True)
+                await user.move_to(team2_channel)
+            except Exception as e:
+                pass
 
-        await asyncio.gather(*awaitables, return_exceptions=True)
         return match_catg, team1_channel, team2_channel
 
     async def finalize_match(self, match_model: MatchModel, guild_model: GuildModel):
         """"""
         match_players = await db.get_match_users(match_model.id, match_model.guild)
+        match_channels = [
+            match_model.team1_channel,
+            match_model.team2_channel,
+            match_model.category
+        ]
 
-        awaitables = []
         for user in match_players:
-            if user is not None:
-                awaitables.append(user.move_to(guild_model.prematch_channel))
+            try:
+                await user.move_to(guild_model.prematch_channel)
+            except Exception as e:
+                pass
 
-        await asyncio.gather(*awaitables, return_exceptions=True)
-
-        for channel in [match_model.team1_channel, match_model.team2_channel, match_model.category]:
+        for channel in match_channels:
             try:
                 await channel.delete()
-            except NotFound:
+            except Exception as e:
                 pass
 
         await db.delete_match(match_model.id)
