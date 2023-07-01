@@ -113,7 +113,7 @@ class MapPoolView(discord.ui.View):
     async def start_mpool(self, interaction: discord.Interaction) -> None:
         """"""
         embed = self.embed_map_pool()
-        await interaction.response.send_message(embed=embed, view=self)
+        await interaction.followup.send(embed=embed, view=self)
 
         self.future = asyncio.get_running_loop().create_future()
         try:

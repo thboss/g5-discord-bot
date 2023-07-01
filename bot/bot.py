@@ -35,10 +35,10 @@ class G5Bot(commands.AutoShardedBot):
                 description=f"**Please slow down** - You can use this command again in {f'{round(hours)} hours' if round(hours) > 0 else ''} {f'{round(minutes)} minutes' if round(minutes) > 0 else ''} {f'{round(seconds)} seconds' if round(seconds) > 0 else ''}.",
                 color=0xE02B2B,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
         elif isinstance(error, (CustomError, APIError)):
             embed = Embed(description=error.message, color=0xE02B2B)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
         elif isinstance(error, app_commands.MissingPermissions):
             embed = Embed(
                 description="You are missing the permission(s) `"
@@ -46,7 +46,7 @@ class G5Bot(commands.AutoShardedBot):
                 + "` to execute this command!",
                 color=0xE02B2B,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
         elif isinstance(error, app_commands.BotMissingPermissions):
             embed = Embed(
                 description="I am missing the permission(s) `"
@@ -54,7 +54,7 @@ class G5Bot(commands.AutoShardedBot):
                 + "` to fully perform this command!",
                 color=0xE02B2B,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
         else:
             self.log_exception(
                 f'Unhandled exception in "{interaction.command.name}" command:', error)

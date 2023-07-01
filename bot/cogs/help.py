@@ -13,6 +13,7 @@ class Help(commands.Cog):
     @commands.cooldown(1, 2, commands.BucketType.user)
     async def help(self, interaction: discord.Interaction):
         """"""
+        await interaction.response.defer()
         embed = discord.Embed(title='Commands List', color=0x02b022)
         commands = await self.bot.tree.fetch_commands()
 
@@ -20,7 +21,7 @@ class Help(commands.Cog):
             embed.add_field(name=cmd.mention,
                             value=cmd.description, inline=False)
 
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot):
