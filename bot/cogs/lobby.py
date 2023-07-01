@@ -9,7 +9,7 @@ from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPEx
 
 from bot.helpers.db import db
 from bot.helpers.models import LobbyModel
-from bot.helpers.errors import CustomError
+from bot.helpers.errors import CustomError, JoinLobbyError
 from bot.messages import ReadyView, MapPoolView
 from bot.bot import G5Bot
 
@@ -55,14 +55,6 @@ GAME_MODE_CHOICES = [
     app_commands.Choice(name="Competitive", value="competitive"),
     app_commands.Choice(name="Wingman", value="wingman")
 ]
-
-
-class JoinLobbyError(ValueError):
-    """ Raised when a player can't join lobby for some reason. """
-
-    def __init__(self, message):
-        """ Set message parameter. """
-        self.message = message
 
 
 class LobbyCog(commands.Cog, name="Lobby"):
@@ -310,22 +302,17 @@ class LobbyCog(commands.Cog, name="Lobby"):
         match_data = await db.get_user_match(user.id, lobby_model.guild)
 
         if not user_model or not user_model.steam:
-            raise JoinLobbyError(
-                f"Unable to add **{user.display_name}**, User not linked.")
+            raise JoinLobbyError(user, "User not linked")
         if match_data:
-            raise JoinLobbyError(
-                f"Unable to add **{user.display_name}**, User in match.")
+            raise JoinLobbyError(user, "User in match")
         if user in queued_users:
-            raise JoinLobbyError(
-                f"Unable to add **{user.display_name}**, User in lobby.")
+            raise JoinLobbyError(user, "User in lobby")
         if len(queued_users) >= lobby_model.capacity:
-            raise JoinLobbyError(
-                f"Unable to add **{user.display_name}**, Lobby is full.")
+            raise JoinLobbyError(user, "Lobby is full")
         try:
             await db.insert_lobby_user(lobby_model.id, user)
         except UniqueViolationError:
-            raise JoinLobbyError(
-                f"Unable to add **{user.display_name}**, Please try again.")
+            raise JoinLobbyError(user, "Please try again")
 
     async def update_queue_msg(self, lobby_model: LobbyModel, title: str = None):
         """"""
