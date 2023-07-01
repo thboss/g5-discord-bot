@@ -10,14 +10,16 @@ from typing import Literal, Union, Optional, List
 
 from bot.helpers.db import db
 from bot.helpers.config_reader import Config
-from bot.helpers.errors import APIError
+from bot.helpers.errors import APIError, AuthError
 
 
 def check_connection(func):
     async def wrapper(*args, **kwargs):
         try:
-            return await func(*args, **kwargs)
-        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            await func(*args, **kwargs)
+        except (AuthError, APIError) as e:
+            raise APIError("API Error: " + e.message)
+        except Exception as e:
             raise APIError("API connection error!")
     return wrapper
 
@@ -172,8 +174,11 @@ async def end_request_log(session, ctx, params):
     logger.info(f'Response received from {params.url} ({elapsed:.2f}s)\n'
                 f'    Status: {params.response.status}\n'
                 f'    Reason: {params.response.reason}')
-    resp_json = await params.response.json()
-    logger.debug(f'Response JSON from {params.url}: {resp_json}')
+    try:
+        resp_json = await params.response.json()
+        logger.debug(f'Response JSON from {params.url}: {resp_json}')
+    except Exception as e:
+        pass
 
 TRACE_CONFIG = aiohttp.TraceConfig()
 TRACE_CONFIG.on_request_start.append(start_request_log)
@@ -234,8 +239,8 @@ class APIManager:
         }
 
         async with self.session.post(url=url, json=[data]) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             resp_data = await resp.json()
             if resp.status >= 400:
                 raise APIError(resp_data['message'])
@@ -248,8 +253,8 @@ class APIManager:
         data = {'team_id': team_id}
 
         async with self.session.delete(url=url, json=[data]) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             return resp.status < 400
 
     @check_connection
@@ -267,8 +272,6 @@ class APIManager:
         }
 
         async with self.session.put(url=url, json=[data]) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
             return resp.status < 400
 
     @check_connection
@@ -281,8 +284,8 @@ class APIManager:
         }
 
         async with self.session.delete(url=url, json=[data]) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             return resp.status < 400
 
     @check_connection
@@ -291,8 +294,8 @@ class APIManager:
         url = f"/api/servers/{server_id}"
 
         async with self.session.get(url=url) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             resp_data = await resp.json()
             return Server.from_dict(resp_data['server'])
 
@@ -302,8 +305,8 @@ class APIManager:
         url = "/api/servers/myservers"
 
         async with self.session.get(url=url) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             resp_data = await resp.json()
             return [Server.from_dict(server) for server in resp_data['servers']]
 
@@ -314,8 +317,8 @@ class APIManager:
         url = f"/api/servers/{server_id}/status"
 
         async with self.session.get(url=url) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             return resp.status < 400
 
     @check_connection
@@ -493,8 +496,8 @@ class APIManager:
         }
 
         async with self.session.post(url=url, json=[data]) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             resp_data = await resp.json()
             return resp_data['id']
 
@@ -516,8 +519,8 @@ class APIManager:
         url = f"/api/matches/{match_id}/cancel"
 
         async with self.session.get(url=url) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             if resp.status >= 400:
                 resp_data = await resp.json()
                 raise APIError(resp_data['message'])
@@ -541,8 +544,8 @@ class APIManager:
         url = f"/api/matches/{match_id}/restart"
 
         async with self.session.get(url=url) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             if resp.status >= 400:
                 resp_data = await resp.json()
                 raise APIError(resp_data['message'])
@@ -566,8 +569,8 @@ class APIManager:
         url = f"/api/matches/{match_id}/pause"
 
         async with self.session.get(url=url) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             if resp.status >= 400:
                 resp_data = await resp.json()
                 raise APIError(resp_data['message'])
@@ -591,8 +594,8 @@ class APIManager:
         url = f"/api/matches/{match_id}/unpause"
 
         async with self.session.get(url=url) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             if resp.status >= 400:
                 resp_data = await resp.json()
                 raise APIError(resp_data['message'])
@@ -632,8 +635,8 @@ class APIManager:
         }
 
         async with self.session.put(url=url, json=[data]) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             if resp.status >= 400:
                 resp_data = await resp.json()
                 raise APIError(resp_data['message'])
@@ -659,8 +662,8 @@ class APIManager:
         data = {'steam_id': steam_id}
 
         async with self.session.put(url=url, json=[data]) as resp:
-            if "/steam/auth" in str(resp.url):
-                raise APIError("Invalid API key!")
+            if "/auth/steam" in str(resp.url):
+                raise AuthError
             if resp.status >= 400:
                 resp_data = await resp.json()
                 raise APIError(resp_data['message'])

@@ -14,8 +14,15 @@ class APIError(AppCommandError):
     """ A custom error that is raised when a command encountres an issue with API. """
 
     def __init__(self, message: str):
-        self.message = "API Error: " + message
+        self.message = message
         super().__init__(message)
+
+
+class AuthError(ValueError):
+    """ A custom error that is raised when a command encountres an issue with API. """
+
+    def __init__(self):
+        self.message = "Invalid API Key!"
 
 
 class JoinLobbyError(ValueError):
