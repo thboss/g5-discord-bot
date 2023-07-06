@@ -16,7 +16,7 @@ from bot.helpers.errors import APIError, AuthError
 def check_connection(func):
     async def wrapper(*args, **kwargs):
         try:
-            await func(*args, **kwargs)
+            return await func(*args, **kwargs)
         except (AuthError, APIError) as e:
             raise APIError("API Error: " + e.message)
         except Exception as e:
@@ -94,7 +94,7 @@ class PlayerStat:
         self.v4 = data["v4"]
         self.v5 = data["v5"]
         self.headshots = data["hsk"]
-        self.hsp = float(data["hsp"])
+        self.hsp = f'{float(data["hsp"]):.0f}%'
         self.rating = float(data["average_rating"])
         self.wins = data["wins"]
         self.played = data["total_maps"]
@@ -102,12 +102,12 @@ class PlayerStat:
     @property
     def win_percent(self):
         """"""
-        return f'{self.wins / self.played * 100:.2f}' if self.played else '0.00'
+        return f'{self.wins / self.played * 100:.0f}%' if self.played else '0%'
 
     @property
     def kdr(self):
         """"""
-        return f'{self.kills / self.deaths:.2f}' if self.deaths else '0.00'
+        return f'{self.kills / self.deaths:.0f}%' if self.deaths else '0%'
 
     @classmethod
     def from_dict(cls, data: dict) -> "PlayerStat":
@@ -322,7 +322,7 @@ class APIManager:
             return resp.status < 400
 
     @check_connection
-    async def get_playerstat(self, user: discord.Member) -> Optional[PlayerStat]:
+    async def get_playerstat(self, user: discord.Member, bot) -> Optional[PlayerStat]:
         """
         Retrieve players stats from the API PUG stats.
 
@@ -332,13 +332,15 @@ class APIManager:
         Returns:
         - PlayerState object if the player existed in the API database, Otherwise return None.
         """
-        user_model = await db.get_user_by_discord_id(user.id)
+        user_model = await db.get_user_by_discord_id(user.id, bot)
+        if not user_model:
+            return
         url = f"/api/playerstats/{user_model.steam}/pug"
 
         async with self.session.get(url=url) as resp:
             if resp.status < 400:
                 resp_data = await resp.json()
-                resp_data["playerstats"]["name"] = user_model.user.display_name
+                resp_data["playerstats"]["name"] = user.display_name
                 return PlayerStat.from_dict(resp_data["playerstats"])
 
     @check_connection
