@@ -89,15 +89,23 @@ class MatchCog(commands.Cog, name="Match"):
 
         if team == "team1":
             api_team = await api.get_team(match_model.team1_id)
+            team_channel = match_model.team1_channel
             team_name = api_team.name
         elif team == "team2":
             api_team = await api.get_team(match_model.team2_id)
+            team_channel = match_model.team2_channel
             team_name = api_team.name
         else:
             team_name = "Spectator"
 
         await api.add_match_player(match_id, user_model.steam, user.display_name, team)
         await db.insert_match_users(match_id, [user])
+
+        try:
+            await team_channel.set_permissions(user, connect=True)
+            await user.move_to(team_channel)
+        except Exception as e:
+            pass
 
         embed = Embed(
             description=f"Player {user.mention} added to match #{match_id}: Team {team_name}")
@@ -113,6 +121,8 @@ class MatchCog(commands.Cog, name="Match"):
         if not match_model:
             raise CustomError("Invalid match ID!")
 
+        guild_model = await db.get_guild_by_id(interaction.guild.id, self.bot)
+
         user_match = await db.get_user_match(user.id, interaction.guild)
         if not user_match or user_match.id != match_id:
             raise CustomError(
@@ -123,11 +133,105 @@ class MatchCog(commands.Cog, name="Match"):
             raise CustomError(
                 f"Unable to remove {user.mention}! User is not linked.")
 
+        team1 = await api.get_team(match_model.team1_id)
+        team2 = await api.get_team(match_model.team2_id)
+
+        if user_model.steam in team1.auth_name.keys():
+            target_team = team1
+            team_channel = match_model.team1_channel
+        elif user_model.steam in team2.auth_name.keys():
+            target_team = team2
+            team_channel = match_model.team2_channel
+        else:
+            target_team = None
+
+        if not target_team:
+            raise CustomError(
+                f"User {user.mention} not in match #{match_id}")
+
         await api.remove_match_player(match_id, user_model.steam)
         await db.delete_match_user(match_id, user)
 
+        try:
+            await team_channel.set_permissions(user, connect=None)
+            await user.move_to(guild_model.prematch_channel)
+        except Exception as e:
+            pass
+
         embed = Embed(
             description=f"Player {user.mention} removed from match #{match_id}")
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="replace-match-player", description="Replace player in a live match")
+    @app_commands.describe(match_id="Match ID", current_user="User to remove from the match", new_user="User to add to the match")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def replace_match_player(self, interaction: Interaction, match_id: int, current_user: Member, new_user: Member):
+        """"""
+        await interaction.response.defer()
+        match_model = await db.get_match_by_id(match_id, self.bot)
+        if not match_model:
+            raise CustomError("Invalid match ID!")
+
+        guild_model = await db.get_guild_by_id(interaction.guild.id, self.bot)
+
+        current_user_model = await db.get_user_by_discord_id(current_user.id, self.bot)
+        if not current_user_model or not current_user_model.steam:
+            raise CustomError(
+                f"Current user {current_user.mention} is not linked.")
+
+        new_user_model = await db.get_user_by_discord_id(new_user.id, self.bot)
+        if not new_user_model or not new_user_model.steam:
+            raise CustomError(
+                f"New user {new_user.mention} is not linked.")
+
+        current_user_match = await db.get_user_match(current_user.id, interaction.guild)
+        if not current_user_match or current_user_match.id != match_id:
+            raise CustomError(
+                f"Current user {current_user.mention} not in match #{match_id}")
+
+        new_user_match = await db.get_user_match(new_user.id, interaction.guild)
+        if new_user_match:
+            raise CustomError(
+                f"New user {new_user.mention} already in a match.")
+
+        team1 = await api.get_team(match_model.team1_id)
+        team2 = await api.get_team(match_model.team2_id)
+
+        if current_user_model.steam in team1.auth_name.keys():
+            target_team = team1
+            team_channel = match_model.team1_channel
+            team_str = 'team1'
+        elif current_user_model.steam in team2.auth_name.keys():
+            target_team = team2
+            team_channel = match_model.team2_channel
+            team_str = 'team2'
+        else:
+            target_team = None
+
+        if not target_team:
+            raise CustomError(
+                f"Current user {current_user.mention} not in match #{match_id}")
+
+        await api.remove_match_player(match_id, current_user_model.steam)
+        await db.delete_match_user(match_id, current_user)
+
+        await api.add_match_player(match_id, new_user_model.steam, new_user.display_name, team_str)
+        await db.insert_match_users(match_id, [new_user])
+
+        try:
+            await team_channel.set_permissions(current_user, connect=None)
+            await current_user.move_to(guild_model.prematch_channel)
+        except Exception as e:
+            pass
+
+        try:
+            await team_channel.set_permissions(new_user, connect=True)
+            await current_user.move_to(team_channel)
+        except Exception as e:
+            pass
+
+        embed = Embed(
+            description=f"User {current_user.mention} replaced to {new_user.mention} in match #{match_id}")
         await interaction.followup.send(embed=embed)
 
     async def autobalance_teams(self, users: List[Member]):
