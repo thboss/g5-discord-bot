@@ -183,6 +183,42 @@ class LobbyCog(commands.Cog, name="Lobby"):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(
+        name='empty-lobby',
+        description='Empty the provided lobby and move users into Pre-Match channel.'
+    )
+    @app_commands.describe(lobby_id="Lobby ID.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def empty_lobby(self, interaction: Interaction, lobby_id: int):
+        """"""
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
+        guild_model = await db.get_guild_by_id(guild.id, self.bot)
+        if not lobby_model:
+            raise CustomError("Invalid Lobby ID")
+
+        if lobby_model.guild.id != guild.id:
+            raise CustomError("This lobby was not created in this server.")
+
+        if self.awaiting[lobby_model.id]:
+            raise CustomError(
+                f"Unable to empty lobby #{lobby_model.id} at this moment, please try again later.")
+
+        self.awaiting[lobby_model.id] = True
+        for user in lobby_model.voice_channel.members:
+            try:
+                await user.move_to(guild_model.prematch_channel)
+            except Exception as e:
+                pass
+
+        await db.clear_lobby_users(lobby_model.id)
+        await self.update_queue_msg(lobby_model, title="Lobby has been emptied")
+        self.awaiting[lobby_model.id] = False
+
+        embed = Embed(description=f"Lobby #{lobby_model.id} has been emptied.")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(
         name='modify-map-pool',
         description='Modify map pool.'
     )
@@ -346,7 +382,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
                    f"Series: *{lobby_model.series.capitalize()}*\n" \
                    f"Auto-ready: *{'ON' if lobby_model.auto_ready else 'OFF'}*"
 
-        queued_players_str = "Lobby is empty" if not queued_users else ""
+        queued_players_str = "*Lobby is empty*" if not queued_users else ""
         for num, user in enumerate(queued_users, start=1):
             queued_players_str += f'{num}. {user.mention}\n'
 
@@ -355,7 +391,9 @@ class LobbyCog(commands.Cog, name="Lobby"):
             name=f"**__Players__** `({len(queued_users)}/{lobby_model.capacity})`:",
             value=queued_players_str
         )
-        embed.set_author(name=f"Lobby #{lobby_model.id}")
+        embed.set_author(
+            name=f"Lobby #{lobby_model.id}", icon_url=self.bot.avatar_url)
+        embed.set_thumbnail(url=self.bot.avatar_url)
         return embed
 
     async def move_to_channel(self, channel: VoiceChannel, users: List[Member]):
