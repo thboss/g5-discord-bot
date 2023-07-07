@@ -14,14 +14,22 @@ class Help(commands.Cog):
     async def help(self, interaction: discord.Interaction):
         """"""
         await interaction.response.defer(ephemeral=True)
-        embed = discord.Embed(title='Commands List', color=0x02b022)
-        commands = await self.bot.tree.fetch_commands()
+        embeds = []
+        all_commands = await self.bot.tree.fetch_commands()
 
-        for cmd in commands:
-            embed.add_field(name=cmd.mention,
-                            value=cmd.description, inline=False)
+        for cog_name, cog in self.bot.cogs.items():
+            if cog_name in ['Help', 'Logger']:
+                continue
+            embed = discord.Embed(title=cog_name + ' Commands', color=0x02b022)
+            cog_commands = cog.get_app_commands()
+            for cmd in cog_commands:
+                for c in all_commands:
+                    if c.name == cmd.name:
+                        embed.add_field(name=c.mention,
+                                        value=c.description, inline=False)
+            embeds.append(embed)
 
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embeds=embeds, ephemeral=True)
 
 
 async def setup(bot):
