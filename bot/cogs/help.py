@@ -13,7 +13,7 @@ class Help(commands.Cog):
     @commands.cooldown(1, 2, commands.BucketType.user)
     async def help(self, interaction: discord.Interaction):
         """"""
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         embed = discord.Embed(title='Commands List', color=0x02b022)
         commands = await self.bot.tree.fetch_commands()
 

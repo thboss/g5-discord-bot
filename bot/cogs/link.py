@@ -18,7 +18,7 @@ class LinkCog(commands.Cog, name='Link'):
         steam='Steam ID or Steam profle link'
     )
     async def link(self, interaction: Interaction, steam: str):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         user = interaction.user
         user_model = await db.get_user_by_discord_id(user.id, self.bot)
         if user_model:
@@ -42,13 +42,13 @@ class LinkCog(commands.Cog, name='Link'):
         await user.add_roles(guild_model.linked_role)
 
         embed = Embed(
-            description=f"You have successfully linked your account with [Steam](https://steamcommunity.com/profiles/{steam_id}/)")
+            description=f"You have successfully linked your account to [Steam](https://steamcommunity.com/profiles/{steam_id}/)")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="unlink", description="Unlink users from their Steam")
     async def unlink(self, interaction: Interaction):
         """"""
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         user = interaction.user
         user_model = await db.get_user_by_discord_id(user.id, self.bot)
         if not user_model:

@@ -47,7 +47,7 @@ class StatsCog(commands.Cog, name="Stats"):
 
         embed = self.playerstat_template(playerstat)
         embed.set_author(name=user.display_name, icon_url=user.avatar)
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="leaderboard", description="Show top player stats")
     async def leaderboard(self, interaction: Interaction):
@@ -88,7 +88,7 @@ class StatsCog(commands.Cog, name="Stats"):
         description += '```'
 
         embed = Embed(title='Leaderboard', description=description)
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
 
 async def setup(bot):

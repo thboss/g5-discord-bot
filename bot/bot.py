@@ -31,33 +31,28 @@ class G5Bot(commands.AutoShardedBot):
             minutes, seconds = divmod(error.retry_after, 60)
             hours, minutes = divmod(minutes, 60)
             hours = hours % 24
-            embed = Embed(
-                description=f"**Please slow down** - You can use this command again in {f'{round(hours)} hours' if round(hours) > 0 else ''} {f'{round(minutes)} minutes' if round(minutes) > 0 else ''} {f'{round(seconds)} seconds' if round(seconds) > 0 else ''}.",
-                color=0xE02B2B,
-            )
+            description = "**Please slow down** - You can use this command again in "
+            + {f'{round(hours)} hours ' if round(hours) > 0 else ''}
+            + {f'{round(minutes)} minutes ' if round(minutes) > 0 else ''}
+            + {f'{round(seconds)} seconds ' if round(seconds) > 0 else ''}
             await interaction.followup.send(embed=embed, ephemeral=True)
         elif isinstance(error, (CustomError, APIError)):
-            embed = Embed(description=error.message, color=0xE02B2B)
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            description = error.message
         elif isinstance(error, app_commands.MissingPermissions):
-            embed = Embed(
-                description="You are missing the permission(s) `"
-                + ", ".join(error.missing_permissions)
-                + "` to execute this command!",
-                color=0xE02B2B,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            description = "You are missing the permission(s) `"
+            + ", ".join(error.missing_permissions)
+            + "` to execute this command!"
         elif isinstance(error, app_commands.BotMissingPermissions):
-            embed = Embed(
-                description="I am missing the permission(s) `"
-                + ", ".join(error.missing_permissions)
-                + "` to fully perform this command!",
-                color=0xE02B2B,
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            description = "I am missing the permission(s) `"
+            + ", ".join(error.missing_permissions)
+            + "` to fully perform this command!"
         else:
+            description = "Something went wrong, see logs for more details."
             self.log_exception(
                 f'Unhandled exception in "{interaction.command.name}" command:', error)
+
+        embed = Embed(description=description, color=0xE02B2B)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     def log_exception(self, msg, error):
         """ Logs an exception. """

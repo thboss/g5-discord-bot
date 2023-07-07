@@ -99,7 +99,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         auto_ready: app_commands.Choice[int]
     ):
         """ Create a new lobby. """
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
         guild_model = await db.get_guild_by_id(guild.id, self.bot)
         category = await guild.create_category(name="Lobby")
@@ -139,7 +139,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
         embed = Embed(
             description=f"Lobby #{lobby_id} has been successfully created.")
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name='remove-lobby',
@@ -149,7 +149,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
     @app_commands.checks.has_permissions(administrator=True)
     async def remove_lobby(self, interaction: Interaction, lobby_id: int):
         """"""
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
         lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
         if not lobby_model:
@@ -180,7 +180,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
                     pass
 
         embed = Embed(description=f"Lobby #{lobby_model.id} has been removed.")
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name='modify-map-pool',
@@ -190,7 +190,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
     @app_commands.checks.has_permissions(administrator=True)
     async def mpool(self, interaction: Interaction, lobby_id: int):
         """"""
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
         user = interaction.user
         lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
@@ -214,10 +214,10 @@ class LobbyCog(commands.Cog, name="Lobby"):
     @app_commands.checks.has_permissions(administrator=True)
     async def add_custom_map(self, interaction: Interaction, display_name: str, dev_name: str):
         """"""
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         map_added = await db.create_custom_guild_map(interaction.guild, display_name, dev_name)
         msg = 'Map added successfully' if map_added else 'Map already exists'
-        await interaction.followup.send(embed=Embed(description=msg))
+        await interaction.followup.send(embed=Embed(description=msg), ephemeral=True)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, user: Member, before: VoiceState, after: VoiceState):
