@@ -212,6 +212,7 @@ class MatchCog(commands.Cog, name="Match"):
         embed = Embed(title=title, description=description)
         embed.set_author(
             name=f"{'🔴' if match_stats.end_time else '🟢'} Match #{match_stats.id}")
+        embed.set_thumbnail(url=self.bot.avatar_url)
         if not mapstats and not match_stats.end_time:
             embed.set_footer(
                 text="Server will close after 5 minutes if anyone doesn't join")
@@ -244,7 +245,7 @@ class MatchCog(commands.Cog, name="Match"):
             else:
                 maps_list = self.random_map(mpool, lobby_model.series)
 
-            match_server = await self.find_match_server()
+            match_server = await self.find_match_server(lobby_model.region)
 
             str_maps = ' '.join(m.dev_name for m in maps_list)
             match_id = await api.create_match(
@@ -262,6 +263,8 @@ class MatchCog(commands.Cog, name="Match"):
             description = 'Setup message removed!'
         except APIError as e:
             description = e.message
+        except ValueError as e:
+            description = e
         except Exception as e:
             exc_lines = traceback.format_exception(
                 type(e), e, e.__traceback__)
@@ -320,10 +323,14 @@ class MatchCog(commands.Cog, name="Match"):
             except Exception as e:
                 self.bot.logger.warning(str(e))
 
-        embed = Embed(title="Match Setup Failed", description=description)
-        await message.edit(embed=embed, view=None)
+        embed = Embed(title="Match Setup Failed",
+                      description=description, color=0xE02B2B)
+        try:
+            await message.edit(embed=embed, view=None, delete_after=30)
+        except Exception as e:
+            pass
 
-    async def find_match_server(self):
+    async def find_match_server(self, region):
         """"""
         try:
             servers = await api.get_servers()
@@ -335,15 +342,16 @@ class MatchCog(commands.Cog, name="Match"):
             if server.in_use:
                 continue
 
+            if region and server.flag != region:
+                continue
+
             try:
-                is_available = await api.is_server_available(server.id)
+                return await api.is_server_available(server.id)
             except Exception as e:
                 self.bot.logger.warning(str(e))
                 continue
-            if is_available:
-                return server
 
-        raise Exception("No game server available.")
+        raise ValueError("No game server available.")
 
     async def create_match_channels(
         self,

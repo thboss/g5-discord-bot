@@ -1,7 +1,7 @@
 # lobby.py
 
 from asyncpg.exceptions import UniqueViolationError
-from typing import List
+from typing import List, Optional
 from collections import defaultdict
 
 from discord.ext import commands
@@ -12,6 +12,7 @@ from bot.helpers.models import LobbyModel
 from bot.helpers.errors import CustomError, JoinLobbyError
 from bot.messages import ReadyView, MapPoolView
 from bot.bot import G5Bot
+from bot.helpers.utils import COUNTRY_FLAGS
 
 
 CAPACITY_CHOICES = [
@@ -75,7 +76,8 @@ class LobbyCog(commands.Cog, name="Lobby"):
         captains_method="Captains selection method",
         map_method="Map selection method",
         series="Number of maps per match",
-        game_mode="Set game mode"
+        game_mode="Set game mode",
+        region="Game server location where the match must setup, e.g. US"
     )
     @app_commands.choices(
         capacity=CAPACITY_CHOICES,
@@ -96,10 +98,14 @@ class LobbyCog(commands.Cog, name="Lobby"):
         map_method: app_commands.Choice[str],
         series: app_commands.Choice[str],
         game_mode: app_commands.Choice[str],
-        auto_ready: app_commands.Choice[int]
+        auto_ready: app_commands.Choice[int],
+        region: Optional[str],
     ):
         """ Create a new lobby. """
         await interaction.response.defer(ephemeral=True)
+        if region and region.upper() not in COUNTRY_FLAGS:
+            raise CustomError("Invalid region code")
+
         guild = interaction.guild
         guild_model = await db.get_guild_by_id(guild.id, self.bot)
         category = await guild.create_category(name="Lobby")
@@ -115,7 +121,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         await voice_channel.set_permissions(guild.default_role, connect=False)
         await voice_channel.set_permissions(guild_model.linked_role, connect=True)
 
-        lobby_id = await db.insert_lobby({
+        lobby_data = {
             'guild': guild.id,
             'capacity': capacity.value,
             'team_method': teams_method.value,
@@ -126,8 +132,12 @@ class LobbyCog(commands.Cog, name="Lobby"):
             'game_mode': game_mode.value,
             'category': category.id,
             'queue_channel': text_channel.id,
-            'lobby_channel': voice_channel.id
-        })
+            'lobby_channel': voice_channel.id,
+        }
+        if region:
+            lobby_data['region'] = region.upper()
+
+        lobby_id = await db.insert_lobby(lobby_data)
 
         await category.edit(name=f"Lobby #{lobby_id}")
 
@@ -391,8 +401,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
             name=f"**__Players__** `({len(queued_users)}/{lobby_model.capacity})`:",
             value=queued_players_str
         )
-        embed.set_author(
-            name=f"Lobby #{lobby_model.id}", icon_url=self.bot.avatar_url)
+        embed.set_author(name=f"Lobby #{lobby_model.id}")
         embed.set_thumbnail(url=self.bot.avatar_url)
         return embed
 

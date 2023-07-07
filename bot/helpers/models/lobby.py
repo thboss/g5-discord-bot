@@ -21,7 +21,8 @@ class LobbyModel:
         map_method: Literal["random", "veto"],
         series: Literal["bo1", "bo2", "bo3"],
         game_mode: Literal["competitive", "wingman"],
-        auto_ready: bool
+        auto_ready: bool,
+        region: str
     ):
         """"""
         self.id = lobby_id
@@ -37,6 +38,7 @@ class LobbyModel:
         self.series = series
         self.game_mode = game_mode
         self.auto_ready = auto_ready
+        self.region = region
 
     @classmethod
     def from_dict(cls, data: dict, guild: discord.Guild) -> "LobbyModel":
@@ -54,5 +56,6 @@ class LobbyModel:
             data['map_method'],
             data['series_type'],
             data['game_mode'],
-            data['autoready']
+            data['autoready'],
+            data['region']
         )
