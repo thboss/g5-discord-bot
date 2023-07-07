@@ -28,25 +28,26 @@ class G5Bot(commands.AutoShardedBot):
 
     async def on_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         """ Executed every time a normal valid command catches an error. """
+        await interaction.response.defer(ephemeral=True)
+
         if isinstance(error, app_commands.CommandOnCooldown):
             minutes, seconds = divmod(error.retry_after, 60)
             hours, minutes = divmod(minutes, 60)
             hours = hours % 24
-            description = "**Please slow down** - You can use this command again in "
-            + {f'{round(hours)} hours ' if round(hours) > 0 else ''}
-            + {f'{round(minutes)} minutes ' if round(minutes) > 0 else ''}
-            + {f'{round(seconds)} seconds ' if round(seconds) > 0 else ''}
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            description = "**Please slow down** - You can use this command again in " \
+                + {f'{round(hours)} hours ' if round(hours) > 0 else ''} \
+                + {f'{round(minutes)} minutes ' if round(minutes) > 0 else ''} \
+                + {f'{round(seconds)} seconds ' if round(seconds) > 0 else ''}
         elif isinstance(error, (CustomError, APIError)):
             description = error.message
         elif isinstance(error, app_commands.MissingPermissions):
-            description = "You are missing the permission(s) `"
-            + ", ".join(error.missing_permissions)
-            + "` to execute this command!"
+            description = "You are missing the permission(s) `" \
+                + ", ".join(error.missing_permissions) \
+                + "` to execute this command!"
         elif isinstance(error, app_commands.BotMissingPermissions):
-            description = "I am missing the permission(s) `"
-            + ", ".join(error.missing_permissions)
-            + "` to fully perform this command!"
+            description = "I am missing the permission(s) `" \
+                + ", ".join(error.missing_permissions) \
+                + "` to fully perform this command!"
         else:
             description = "Something went wrong, see logs for more details."
             self.log_exception(
