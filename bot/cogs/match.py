@@ -450,7 +450,9 @@ class MatchCog(commands.Cog, name="Match"):
                 continue
 
             try:
-                return await api.is_server_available(server.id)
+                is_available = await api.is_server_available(server.id)
+                if is_available:
+                    return server
             except Exception as e:
                 self.bot.logger.warning(str(e))
                 continue
