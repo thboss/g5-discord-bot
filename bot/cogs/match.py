@@ -226,7 +226,7 @@ class MatchCog(commands.Cog, name="Match"):
 
         try:
             await team_channel.set_permissions(new_user, connect=True)
-            await current_user.move_to(team_channel)
+            await new_user.move_to(team_channel)
         except Exception as e:
             pass
 
