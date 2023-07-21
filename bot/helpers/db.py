@@ -2,14 +2,12 @@
 
 import asyncpg
 import logging
-import os
 from typing import List, Union, Optional
 
 import discord
-from discord.ext import commands
 
 from bot.helpers.config_reader import Config
-from .models import GuildModel, LobbyModel, MapModel, UserModel, MatchModel
+from .models import *
 
 
 class DBManager:
@@ -411,6 +409,52 @@ class DBManager:
 
         if new_maps:
             await self.insert_guild_maps(guild, new_maps)
+
+    async def get_team_by_id(self, team_id: int, bot) -> Union["TeamModel", None]:
+        """"""
+        sql = "SELECT * FROM teams WHERE id = $1;"
+        data = await self.query(sql, team_id)
+        if data:
+            guild = bot.get_guild(data[0]['guild'])
+            if guild:
+                return TeamModel.from_dict(data[0], guild)
+            
+    async def get_team_by_role(self, role: discord.Role, bot) -> Union["TeamModel", None]:
+        """"""
+        sql = "SELECT * FROM teams WHERE role = $1;"
+        data = await self.query(sql, role.id)
+        if data:
+            guild = bot.get_guild(data[0]['guild'])
+            if guild:
+                return TeamModel.from_dict(data[0], guild)
+            
+    async def get_guild_teams(self, guild: discord.Guild):
+        """"""
+        sql = "SELECT * FROM teams WHERE guild = $1;"
+        data = await self.query(sql, guild.id)
+        return [TeamModel.from_dict(team_data, guild) for team_data in data]
+    
+    async def insert_team(self, data: dict) -> None:
+        """"""
+        cols = ", ".join(col for col in data)
+        vals = ", ".join(str(val) for val in data.values())
+        sql = f"INSERT INTO teams ({cols})\n" \
+            f"    VALUES({vals});"
+        await self.query(sql)
+
+    async def update_team(self, team_id: int, **kwargs) -> None:
+        """"""
+        sql = "UPDATE teams SET $2 WHERE id = $1;"
+        await self.query(sql, team_id, **kwargs)
+
+    async def insert_team_users(self, team_id: int, users: List[discord.Member]) -> None:
+        """"""
+        values = f", ".join(
+            f"({team_id}, {user.id})" for user in users)
+        sql = f"INSERT INTO team_users VALUES {values};"
+        await self.query(sql)
+
+    
 
 
 db = DBManager()
