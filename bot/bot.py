@@ -28,7 +28,6 @@ class G5Bot(commands.AutoShardedBot):
 
     async def on_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         """ Executed every time a normal valid command catches an error. """
-        await interaction.response.defer(ephemeral=True)
 
         if isinstance(error, app_commands.CommandOnCooldown):
             minutes, seconds = divmod(error.retry_after, 60)
@@ -52,6 +51,7 @@ class G5Bot(commands.AutoShardedBot):
             description = "Something went wrong, see logs for more details."
             self.log_exception(
                 f'Unhandled exception in "{interaction.command.name}" command:', error)
+            return
 
         embed = Embed(description=description, color=0xE02B2B)
         await interaction.followup.send(embed=embed, ephemeral=True)
