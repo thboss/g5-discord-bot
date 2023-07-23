@@ -7,7 +7,7 @@ from typing import List, Union, Optional
 import discord
 
 from bot.helpers.config_reader import Config
-from .models import *
+from bot.helpers.models import LobbyModel, MapModel, MatchModel, GuildModel, UserModel, TeamModel
 
 
 class DBManager:
@@ -453,6 +453,23 @@ class DBManager:
             f"({team_id}, {user.id})" for user in users)
         sql = f"INSERT INTO team_users VALUES {values};"
         await self.query(sql)
+
+    async def delete_team_users(self, team_id: int, users: List[discord.Member]) -> List[dict]:
+        """"""
+        sql = "DELETE FROM team_users\n" \
+            f"    WHERE team_id = $1 AND user_id::BIGINT = ANY(ARRAY{[u.id for u in users]}::BIGINT[])\n" \
+            "    RETURNING user_id;"
+        return await self.query(sql, team_id)
+    
+    async def get_user_team(self, user_id: int, guild: discord.Guild) -> Optional[TeamModel]:
+        """"""
+        sql = "SELECT t.* FROM teams t\n" \
+            "JOIN team_users tu\n" \
+            "    ON tu.team_id = t.id AND t.guild = $1\n" \
+            "WHERE tu.user_id = $2;"
+        data = await self.query(sql, guild.id, user_id)
+        if data:
+            return TeamModel.from_dict(data[0], guild)
 
     
 
