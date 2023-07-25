@@ -470,7 +470,21 @@ class DBManager:
         data = await self.query(sql, guild.id, user_id)
         if data:
             return TeamModel.from_dict(data[0], guild)
-
+        
+    async def get_team_users(self, team_id: int, guild: discord.Guild) -> List[discord.Member]:
+        """"""
+        sql = "SELECT user_id FROM team_users tu\n" \
+            "JOIN teams t\n" \
+            "    ON tu.team_id = t.id AND t.guild = $1\n" \
+            "WHERE tu.team_id = $2;"
+        data = await self.query(sql, guild.id, team_id)
+        users_ids = list(map(lambda r: r['user_id'], data))
+        team_users = []
+        for uid in users_ids:
+            user = guild.get_member(uid)
+            if user:
+                team_users.append(user)
+        return team_users
     
 
 
