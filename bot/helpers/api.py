@@ -6,7 +6,7 @@ import logging
 import json
 import aiohttp
 from datetime import datetime
-from typing import Literal, Union, Optional, List
+from typing import Literal, Union, Optional, List, Dict
 
 from bot.helpers.db import db
 from bot.helpers.config_reader import Config
@@ -222,19 +222,18 @@ class APIManager:
             return Team.from_dict(resp_data['team'])
 
     @check_connection
-    async def create_team(self, name: str, users: List[discord.Member]):
+    async def create_team(self, name: str, users_dict: Dict[str, Dict[str, bool]]):
         """"""
-        users_model = await db.get_users(users)
         url = "/api/teams"
         data = {
             'name': 'team_' + name,
             'public_team': 0,
             'auth_name': {
-                db_user.steam: {
-                    'name': db_user.user.display_name,
-                    'captain': index == 0,
+                steam: {
+                    'name': value['nickname'],
+                    'captain': value['captain'],
                     'coach': False
-                } for index, db_user in enumerate(users_model)
+                } for steam, value in users_dict.items()
             }
         }
 

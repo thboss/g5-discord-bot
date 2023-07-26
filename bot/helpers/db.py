@@ -486,6 +486,10 @@ class DBManager:
                 team_users.append(user)
         return team_users
     
+    async def delete_team(self, team_id: int, guild: discord.Guild):
+        """"""
+        sql = "DELETE FROM teams WHERE id = $1 AND guild = $2;"
+        await self.query(sql, team_id, guild.id)
 
 
 db = DBManager()
