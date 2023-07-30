@@ -36,7 +36,7 @@ class ReadyView(discord.ui.View):
         await self.message.edit(embed=self._embed_ready(),
                                 view=None if self.all_ready else self)
 
-        await interaction.response.send_message('You are ready!', ephemeral=True)
+        await interaction.response.defer()
 
         if self.all_ready:
             self.stop()
@@ -64,8 +64,10 @@ class ReadyView(discord.ui.View):
         embed.set_footer(text="Click the button below when you are ready.")
         return embed
 
-    async def ready_up(self, channel: discord.TextChannel):
-        self.message = await channel.send(embed=self._embed_ready(), view=self)
+    async def ready_up(self, message: discord.Message):
+        mentions_users = ''.join(u.mention for u in self.users)
+        mentions_msg = await message.channel.send(content=mentions_users)
+        self.message = await message.edit(embed=self._embed_ready(), view=self)
         self.future = asyncio.get_running_loop().create_future()
 
         try:
@@ -75,7 +77,7 @@ class ReadyView(discord.ui.View):
 
         await asyncio.sleep(2)
         try:
-            await self.message.delete()
+            await mentions_msg.delete()
         except Exception:
             pass
 

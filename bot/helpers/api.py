@@ -228,13 +228,7 @@ class APIManager:
         data = {
             'name': 'team_' + name,
             'public_team': 0,
-            'auth_name': {
-                steam: {
-                    'name': value['nickname'],
-                    'captain': value['captain'],
-                    'coach': False
-                } for steam, value in users_dict.items()
-            }
+            'auth_name': users_dict
         }
 
         async with self.session.post(url=url, json=[data]) as resp:
@@ -254,7 +248,7 @@ class APIManager:
         async with self.session.delete(url=url, json=[data]) as resp:
             if "/auth/steam" in str(resp.url):
                 raise AuthError
-            return resp.status < 400
+            return resp.status
 
     @check_connection
     async def add_team_member(self, team_id: int, steam_id: str, nickname: str, captain: bool = False):
@@ -452,7 +446,8 @@ class APIManager:
         team2_id: int,
         str_maps: str,
         total_players: int,
-        game_mode: Literal["competitive", "wingman"]
+        game_mode: Literal["competitive", "wingman"],
+        pug: bool=True
     ) -> int:
         """
         Sends an HTTP POST request to create a new match.
@@ -480,7 +475,7 @@ class APIManager:
             'team2_id': team2_id,
             'title': '[PUG] Map {MAPNUMBER} of {MAXMAPS}',
             'wingman': game_mode == 'wingman',
-            'is_pug': True,
+            'is_pug': pug,
             'start_time': datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
             'ignore_server': 0,
             'max_maps': len(str_maps.split()),

@@ -33,10 +33,10 @@ class G5Bot(commands.AutoShardedBot):
             minutes, seconds = divmod(error.retry_after, 60)
             hours, minutes = divmod(minutes, 60)
             hours = hours % 24
-            description = "**Please slow down** - You can use this command again in " \
-                + {f'{round(hours)} hours ' if round(hours) > 0 else ''} \
-                + {f'{round(minutes)} minutes ' if round(minutes) > 0 else ''} \
-                + {f'{round(seconds)} seconds ' if round(seconds) > 0 else ''}
+            hours = f'{round(hours)} hours ' if round(hours) > 0 else ''
+            minutes = f'{round(minutes)} minutes ' if round(minutes) > 0 else ''
+            seconds = f'{round(seconds)} seconds ' if round(seconds) > 0 else ''
+            description = f"**Please slow down** - You can use this command again in {hours}{minutes}{seconds}"
         elif isinstance(error, (CustomError, APIError)):
             description = error.message
         elif isinstance(error, app_commands.MissingPermissions):

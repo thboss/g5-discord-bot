@@ -1,7 +1,7 @@
 # match.py
 
 from discord.ext import commands, tasks
-from discord import Embed, NotFound, app_commands, Member, Message, Interaction
+from discord import Embed, NotFound, app_commands, Member, Message, Interaction, Guild
 from typing import Literal, List
 
 from random import sample, shuffle
@@ -11,7 +11,7 @@ import asyncio
 
 from bot.helpers.api import api, Match, MapStat, Server
 from bot.helpers.db import db
-from bot.helpers.models import GuildModel, LobbyModel, MatchModel, MapModel
+from bot.helpers.models import GuildModel, TeamModel, MatchModel, MapModel
 from bot.bot import G5Bot
 from bot.helpers.errors import CustomError, APIError
 from bot.helpers.config_reader import Config
@@ -264,10 +264,10 @@ class MatchCog(commands.Cog, name="Match"):
         team2_users = list(map(stats_dict.get, team2_stats))
         return team1_users, team2_users
 
-    async def draft_teams(self, message: Message, users: List[Member], lobby_model: LobbyModel):
+    async def draft_teams(self, message: Message, users: List[Member], captain_method: str):
         """"""
         menu = PickTeamsView(message, users)
-        teams = await menu.get_teams(lobby_model.captain_method)
+        teams = await menu.get_teams(captain_method)
         return teams[0], teams[1]
 
     def randomize_teams(self, users: List[Member]):
@@ -322,75 +322,98 @@ class MatchCog(commands.Cog, name="Match"):
                 text="Server will close after 5 minutes if anyone doesn't join")
         return embed
 
-    async def start_match(self, users: List[Member], lobby_model: LobbyModel, guild_model: GuildModel, message: Message):
+    async def start_match(
+        self,
+        guild: Guild,
+        message: Message,
+        mpool: List[MapModel],
+        game_mode: str='competitive',
+        queue_users: List[Member]=[], 
+        team_method: str='captains',
+        map_method: str='veto',
+        captain_method: str='rank',
+        series: str='bo1',
+        region: str='',
+        team1_model: TeamModel=None,
+        team2_model: TeamModel=None
+    ):
         """"""
-        team1_id = None
-        team2_id = None
-        team1_name = None
-        team2_name = None
-        team1_users = None
-        team2_users = None
+        is_pug = len(queue_users) > 0
+        await asyncio.sleep(3)
         try:
-            if lobby_model.team_method == 'captains' and len(users) > 3:
-                team1_users, team2_users = await self.draft_teams(message, users, lobby_model)
-            elif lobby_model.team_method == 'autobalance' and len(users) > 3:
-                team1_users, team2_users = await self.autobalance_teams(users)
-            else:  # team_method is random
-                team1_users, team2_users = self.randomize_teams(users)
+            if not is_pug: # official match
+                team1_captain = team1_model.captain
+                team2_captain = team2_model.captain
+                team1_name = team1_model.name
+                team2_name = team2_model.name
+                team1_id = team1_model.id
+                team2_id = team2_model.id
+                team1_users = await db.get_team_users(team1_id, guild)
+                team2_users = await db.get_team_users(team2_id, guild)
+            else: # pug match
+                if team_method == 'captains' and len(queue_users) > 3:
+                    team1_users, team2_users = await self.draft_teams(message, queue_users, captain_method)
+                elif team_method == 'autobalance' and len(queue_users) > 3:
+                    team1_users, team2_users = await self.autobalance_teams(queue_users)
+                else:  # team_method is random
+                    team1_users, team2_users = self.randomize_teams(queue_users)
+                
+                team1_users_model = await db.get_users(team1_users)
+                team2_users_model = await db.get_users(team2_users)
+                team1_captain = team1_users[0]
+                team2_captain = team2_users[0]
+                team1_name = team1_captain.display_name
+                team2_name = team2_captain.display_name
+                dict_team1_users = { user_model.steam: {
+                    'name': user_model.user.display_name,
+                    'captain': user_model.user == team1_captain,
+                    'coach': False,
+                } for user_model in team1_users_model}
+                dict_team2_users = { user_model.steam: {
+                    'name': user_model.user.display_name,
+                    'captain': user_model.user == team2_captain,
+                    'coach': False,
+                } for user_model in team2_users_model}
+                team1_id = await api.create_team(team1_name, dict_team1_users)
+                team2_id = await api.create_team(team2_name, dict_team2_users)
 
-            team1_name = team1_users[0].display_name
-            team2_name = team2_users[0].display_name
-            team1_id = await api.create_team(team1_name, team1_users)
-            team2_id = await api.create_team(team2_name, team2_users)
-
-            mpool = await db.get_lobby_maps(lobby_model.id)
-            if lobby_model.map_method == 'veto':
-                maps_list = await self.veto_map(message, lobby_model.series, mpool, team1_users[0], team2_users[0])
+            if map_method == 'veto':
+                maps_list = await self.veto_map(message, series, mpool, team1_captain, team2_captain)
             else:
-                maps_list = self.random_map(mpool, lobby_model.series)
-
-            match_server = await self.find_match_server(lobby_model.region)
-
+                maps_list = self.random_map(mpool, series)
             str_maps = ' '.join(m.dev_name for m in maps_list)
+            await message.edit(embed=Embed(description='Searching for available game servers...'))
+            await asyncio.sleep(2)
+            match_server = await self.find_match_server(region)
+            await message.edit(embed=Embed(description='Setting up match on game server...'))
+            await asyncio.sleep(2)
+
             match_id = await api.create_match(
                 match_server.id,
                 team1_id,
                 team2_id,
                 str_maps,
                 len(team1_users + team2_users),
-                lobby_model.game_mode
+                game_mode,
+                is_pug
             )
 
-        except asyncio.TimeoutError:
-            description = 'Setup took too long!'
-        except NotFound:
-            description = 'Setup message removed!'
-        except APIError as e:
-            description = e.message
-        except ValueError as e:
-            description = e
-        except Exception as e:
-            exc_lines = traceback.format_exception(
-                type(e), e, e.__traceback__)
-            exc = ''.join(exc_lines)
-            self.bot.logger.error(exc)
-            description = 'Something went wrong! See logs for details'
-        else:
+            await message.edit(embed=Embed(description='Setting up teams channels...'))
             category, team1_channel, team2_channel = await self.create_match_channels(
                 match_id,
                 team1_name,
                 team2_name,
                 team1_users,
                 team2_users,
-                guild_model
+                guild
             )
 
             await db.insert_match({
                 'id': match_id,
                 'team1_id': team1_id,
                 'team2_id': team2_id,
-                'lobby': lobby_model.id,
-                'guild': guild_model.guild.id,
+                'guild': guild.id,
+                'channel': message.channel.id,
                 'message': message.id,
                 'category': category.id,
                 'team1_channel': team1_channel.id,
@@ -401,13 +424,21 @@ class MatchCog(commands.Cog, name="Match"):
             await db.insert_match_users(match_id, team1_users + team2_users)
             embed = self.embed_match_info(match_stats, match_server)
 
+        except asyncio.TimeoutError:
+            description = 'Setup took too long!'
+        except APIError as e:
+            description = e.message
+            self.bot.log_exception('API ERROR: ', e)
+        except ValueError as e:
+            description = e
+        except Exception as e:
+            self.bot.log_exception('Unhandled exception in "cogs.match.start_match": ', e)
+            description = 'Something went wrong! See logs for details'
+        else:
             try:
                 await message.edit(embed=embed)
-            except NotFound:
-                try:
-                    await lobby_model.text_channel.send(embed=embed)
-                except Exception as e:
-                    self.bot.logger.info(str(e))
+            except Exception as e:
+                pass
 
             if not self.check_live_matches.is_running():
                 self.check_live_matches.start()
@@ -415,13 +446,12 @@ class MatchCog(commands.Cog, name="Match"):
             return True
 
         # Delete the created teams from api if setup didn't complete
-        if team1_id:
+        if is_pug:
             try:
                 await api.delete_team(team1_id)
             except Exception as e:
                 self.bot.logger.warning(str(e))
 
-        if team2_id:
             try:
                 await api.delete_team(team2_id)
             except Exception as e:
@@ -434,13 +464,9 @@ class MatchCog(commands.Cog, name="Match"):
         except Exception as e:
             pass
 
-    async def find_match_server(self, region):
+    async def find_match_server(self, region=None):
         """"""
-        try:
-            servers = await api.get_servers()
-        except Exception as e:
-            self.bot.logger.warning(str(e))
-            raise Exception(str(e))
+        servers = await api.get_servers()
 
         for server in servers:
             if server.in_use:
@@ -454,7 +480,7 @@ class MatchCog(commands.Cog, name="Match"):
                 if is_available:
                     return server
             except Exception as e:
-                self.bot.logger.warning(str(e))
+                self.bot.log_exception('API ERROR: ', e)
                 continue
 
         raise ValueError("No game server available.")
@@ -466,25 +492,25 @@ class MatchCog(commands.Cog, name="Match"):
         team2_name: str,
         team1_users: List[Member],
         team2_users: List[Member],
-        guild_model: GuildModel
+        guild: Guild
     ):
         """"""
-        match_catg = await guild_model.guild.create_category_channel(f"Match #{match_id}")
+        match_catg = await guild.create_category_channel(f"Match #{match_id}")
 
-        team1_channel = await guild_model.guild.create_voice_channel(
+        team1_channel = await guild.create_voice_channel(
             name=f"Team {team1_name}",
             category=match_catg
         )
 
-        team2_channel = await guild_model.guild.create_voice_channel(
+        team2_channel = await guild.create_voice_channel(
             name=f"Team {team2_name}",
             category=match_catg
         )
 
-        await team1_channel.set_permissions(guild_model.guild.self_role, connect=True)
-        await team2_channel.set_permissions(guild_model.guild.self_role, connect=True)
-        await team1_channel.set_permissions(guild_model.guild.default_role, connect=False, read_messages=True)
-        await team2_channel.set_permissions(guild_model.guild.default_role, connect=False, read_messages=True)
+        await team1_channel.set_permissions(guild.self_role, connect=True)
+        await team2_channel.set_permissions(guild.self_role, connect=True)
+        await team1_channel.set_permissions(guild.default_role, connect=False, read_messages=True)
+        await team2_channel.set_permissions(guild.default_role, connect=False, read_messages=True)
 
         for user in team1_users:
             try:
@@ -532,14 +558,13 @@ class MatchCog(commands.Cog, name="Match"):
         game_server = None
         message = None
         guild_model = await db.get_guild_by_id(match_model.guild.id, self.bot)
-        lobby_model = await db.get_lobby_by_id(match_model.lobby_id, self.bot)
 
-        if not lobby_model:
+        if not match_model.text_channel:
             await self.finalize_match(match_model, guild_model)
             return
 
         try:
-            message = await lobby_model.text_channel.fetch_message(match_model.message_id)
+            message = await match_model.text_channel.fetch_message(match_model.message_id)
         except NotFound:
             pass
 

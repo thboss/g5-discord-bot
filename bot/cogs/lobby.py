@@ -330,13 +330,20 @@ class LobbyCog(commands.Cog, name="Lobby"):
                     await db.delete_lobby_users(lobby_model.id, unreadied_users)
                     await self.move_to_channel(guild_model.prematch_channel, unreadied_users)
                 else:
+                    map_pool = await db.get_lobby_maps(lobby_model.id)
                     match_cog = self.bot.get_cog('Match')
-                    match_msg = await lobby_model.text_channel.send(embed=Embed(description='Match Setup Process..'))
+                    match_msg = await lobby_model.text_channel.send(embed=Embed(description='Starting match setup...'))
                     match_started = await match_cog.start_match(
-                        queued_users,
-                        lobby_model,
-                        guild_model,
-                        match_msg
+                        lobby_model.guild,
+                        match_msg,
+                        map_pool,
+                        queue_users=queued_users,
+                        game_mode=lobby_model.game_mode,
+                        team_method=lobby_model.team_method,
+                        captain_method=lobby_model.captain_method,
+                        map_method=lobby_model.map_method,
+                        series=lobby_model.series,
+                        region=lobby_model.region
                     )
                     if not match_started:
                         await self.move_to_channel(guild_model.prematch_channel, queued_users)
