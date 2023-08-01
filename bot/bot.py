@@ -10,7 +10,7 @@ from discord import app_commands, Interaction, Embed, Guild
 
 from .helpers.db import db
 from .helpers.api import api
-from .helpers.config_reader import Config
+from .helpers.configs import Config
 from .helpers.errors import CustomError, APIError
 
 
@@ -27,7 +27,7 @@ class G5Bot(commands.AutoShardedBot):
         self.tree.on_error = self.on_app_command_error
 
     async def on_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
-        """ Executed every time a normal valid command catches an error. """
+        """ Executed every time a slash command catches an error. """
 
         if isinstance(error, app_commands.CommandOnCooldown):
             minutes, seconds = divmod(error.retry_after, 60)
@@ -50,11 +50,10 @@ class G5Bot(commands.AutoShardedBot):
         else:
             description = "Something went wrong, see logs for more details."
             self.log_exception(
-                f'Unhandled exception in "{interaction.command.name}" command:', error)
-            return
+                f'Unhandled exception in "{interaction.command.name}" command: ', error)
 
         embed = Embed(description=description, color=0xE02B2B)
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed, ephemeral=True, view=None)
 
     def log_exception(self, msg, error):
         """ Logs an exception. """

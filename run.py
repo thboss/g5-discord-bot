@@ -6,7 +6,7 @@ import json
 
 from discord import Intents
 
-from bot.helpers.config_reader import Config
+from bot.helpers.configs import Config
 from bot.bot import G5Bot
 
 

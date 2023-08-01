@@ -6,7 +6,7 @@ class CustomError(AppCommandError):
     """ A custom error that is raised when a command encountres an issue. """
 
     def __init__(self, message: str):
-        self.message = "Error: " + message
+        self.message = message
         super().__init__(message)
 
 

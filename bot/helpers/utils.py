@@ -25,6 +25,28 @@ COUNTRY_FLAGS = [
 ]
 
 
+DEFAULT_MAPS = {
+    'competitive': {
+        'de_dust2': 'Dust II',
+        'de_inferno': 'Inferno',
+        'de_vertigo': 'Vertigo',
+        'de_overpass': 'Overpass',
+        'de_mirage': 'Mirage',
+        'de_nuke': 'Nuke',
+        'de_ancient': 'Ancient',
+    },
+    'wingman': {
+        'de_boyard': 'Boyard',
+        'de_chalice': 'Chalice',
+        'de_cobblestone': 'Cobblestone',
+        'de_shortdust': 'Shortdust',
+        'de_shortnuke': 'Shortnuke',
+        'de_train': 'Train',
+        'de_vertigo': 'Vertigo'
+    }
+}
+
+
 def validate_steam(steam: str) -> int:
     try:
         steam_id = SteamID(steam)

@@ -1,5 +1,7 @@
 # bot/helpers/models/map.py
 
+from typing import Literal
+
 
 class MapModel:
     """"""
@@ -8,11 +10,13 @@ class MapModel:
         self,
         display_name: str,
         dev_name: str,
+        game_mode: Literal["competitive", "wingman"],
         map_id=None,
     ):
         """"""
         self.display_name = display_name
         self.dev_name = dev_name
+        self.game_mode = game_mode
         self.map_id = map_id
 
     def __eq__(self, other):
@@ -23,12 +27,9 @@ class MapModel:
     @classmethod
     def from_dict(cls, data: dict) -> "MapModel":
         """"""
-        display_name = data['display_name']
-        dev_name = data['dev_name']
-        map_id = data['map_id']
-
         return cls(
-            display_name,
-            dev_name,
-            map_id=map_id
+            data['display_name'],
+            data['dev_name'],
+            data['game_mode'],
+            map_id=data['map_id']
         )

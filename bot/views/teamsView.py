@@ -1,30 +1,30 @@
 # teamsView.py
 
-import asyncio
+from discord import Interaction, Member, Message, ButtonStyle, Embed
+from discord.ui import View, Button
 from random import shuffle
 from typing import List
+
 from bot.helpers.api import api
 
-import discord
 
-
-class PlayerButton(discord.ui.Button['PickTeamsView']):
-    def __init__(self, user: discord.Member):
-        super().__init__(label=user.display_name, style=discord.ButtonStyle.secondary)
+class PlayerButton(Button['PickTeamsView']):
+    def __init__(self, user: Member):
+        super().__init__(label=user.display_name, style=ButtonStyle.secondary)
         self.user = user
 
-    async def callback(self, interaction: discord.Interaction):
+    async def callback(self, interaction: Interaction):
         await self.view.on_click_button(interaction, self)
 
 
-class PickTeamsView(discord.ui.View):
-    def __init__(self, setup_message: discord.Message, users: List[discord.Member], timeout=180):
+class PickTeamsView(View):
+    def __init__(self, message: Message, users: List[Member], timeout=180):
         super().__init__(timeout=timeout)
         self.players_buttons = [PlayerButton(user) for user in users]
         for button in self.players_buttons:
             self.add_item(button)
 
-        self.setup_message = setup_message
+        self.message = message
         self.users = users
         self.pick_order = '1' + '2211' * 20
         self.pick_number = 0
@@ -41,7 +41,7 @@ class PickTeamsView(discord.ui.View):
         except IndexError:
             return None
 
-    def _pick_player(self, captain: discord.Member, selected_player: discord.Member):
+    def _pick_player(self, captain: Member, selected_player: Member):
         if captain == selected_player:
             return False
 
@@ -70,62 +70,63 @@ class PickTeamsView(discord.ui.View):
         self.pick_number += 1
         return True
 
-    async def on_click_button(self, interaction: discord.Interaction, button: PlayerButton):
+    async def on_click_button(self, interaction: Interaction, button: PlayerButton):
+        await interaction.response.defer()
         captain = interaction.user
         selected_player = button.user
+        print('captain', captain)
+        print('selected player', selected_player)
 
         if selected_player is None or selected_player not in self.users_left or captain not in self.users:
             return
+        
+        print('here')
 
         if not self._pick_player(captain, selected_player):
+            print('not _pick_player')
             return
 
         self._remove_captain_button(captain)
 
         title = f"Team **{captain.display_name}** picked **{selected_player.display_name}**"
 
-        if len(self.users_left) == 0:
+        if not self.users_left:
             embed = self.create_teams_embed(title)
-            await self.setup_message.edit(embed=embed, view=None)
-            if self.future is not None:
-                try:
-                    self.future.set_result(None)
-                except asyncio.InvalidStateError:
-                    pass
+            await self.message.edit(embed=embed, view=None)
             self.stop()
             return
 
         self.remove_item(button)
         embed = self.create_teams_embed(title)
-        await interaction.response.edit_message(embed=embed, view=self)
+        await self.message.edit(embed=embed, view=self)
 
-    def _remove_captain_button(self, captain: discord.Member):
+    def _remove_captain_button(self, captain: Member):
         captain_button = next(
             (btn for btn in self.players_buttons if btn.user == captain), None)
         if captain_button:
             self.remove_item(captain_button)
 
     def create_teams_embed(self, title: str):
-        embed = discord.Embed(title=title)
+        embed = Embed(title=title)
         self.add_team_fields(embed)
         if self.users_left:
             self.add_players_left_field(embed)
             self.add_captains_info_field(embed)
         return embed
 
-    def add_team_fields(self, embed: discord.Embed):
+    def add_team_fields(self, embed: Embed):
         for idx, team in enumerate(self.teams, start=1):
             team_name = f'__Team {idx}__'
             team_players = "*Empty*" if len(
                 team) == 0 else '\n'.join(u.mention for u in team)
             embed.add_field(name=team_name, value=team_players)
 
-    def add_players_left_field(self, embed: discord.Embed):
+    def add_players_left_field(self, embed: Embed):
         users_left_str = '\n'.join(user.mention for user in self.users if not any(
             user in team for team in self.teams))
         embed.insert_field_at(1, name="Players Left", value=users_left_str)
 
-    def add_captains_info_field(self, embed: discord.Embed):
+    def add_captains_info_field(self, embed: Embed):
         status_str = ''
         status_str += f'Team1 captain: {self.teams[0][0].mention}\n' if len(
             self.teams[0]) else 'Team1 captain:\n'
@@ -134,7 +135,7 @@ class PickTeamsView(discord.ui.View):
         status_str += f'Choice: {self._active_picker.mention}' if self._active_picker is not None else 'Choice:'
         embed.add_field(name="Captains Info", value=status_str)
 
-    async def get_teams(self, captain_method: str):
+    async def start(self, captain_method: str):
         if captain_method == 'rank':
             try:
                 leaderboard = await api.get_leaderboard(self.users)
@@ -162,13 +163,5 @@ class PickTeamsView(discord.ui.View):
                 team.append(captain)
                 self._remove_captain_button(captain)
 
-        embed = self.create_teams_embed("Pick Teams")
-        await self.setup_message.edit(embed=embed, view=self)
-
-        if self.users_left:
-            self.future = asyncio.get_running_loop().create_future()
-            await asyncio.wait_for(self.future, 180)
-
-        await self.setup_message.edit(view=None)
-        await asyncio.sleep(3)
-        return self.teams
+        if not self.users_left:
+            self.stop()

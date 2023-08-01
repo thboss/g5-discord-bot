@@ -5,23 +5,23 @@ from typing import List, Optional
 from collections import defaultdict
 
 from discord.ext import commands
-from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPException, VoiceChannel
+from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPException, VoiceChannel, SelectOption
 
 from bot.helpers.db import db
 from bot.helpers.models import LobbyModel
 from bot.helpers.errors import CustomError, JoinLobbyError
-from bot.messages import ReadyView, MapPoolView
+from bot.views import ReadyView, MapPoolView, DropDownView
 from bot.bot import G5Bot
 from bot.helpers.utils import COUNTRY_FLAGS
 
 
 CAPACITY_CHOICES = [
-    app_commands.Choice(name="2 Players", value=2),
-    app_commands.Choice(name="4 Players", value=4),
-    app_commands.Choice(name="6 Players", value=6),
-    app_commands.Choice(name="8 Players", value=8),
-    app_commands.Choice(name="10 Players", value=10),
-    app_commands.Choice(name="12 Players", value=12),
+    app_commands.Choice(name="1vs1", value=2),
+    app_commands.Choice(name="2vs2", value=4),
+    app_commands.Choice(name="3vs3", value=6),
+    app_commands.Choice(name="4vs4", value=8),
+    app_commands.Choice(name="5vs5", value=10),
+    app_commands.Choice(name="6vs6", value=12),
 ]
 
 TEAM_SELECTION_CHOICES = [
@@ -77,7 +77,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         map_method="Map selection method",
         series="Number of maps per match",
         game_mode="Set game mode",
-        region="Game server location where the match must setup, e.g. US"
+        region="Game server location where the match must setup. e.g. US"
     )
     @app_commands.choices(
         capacity=CAPACITY_CHOICES,
@@ -141,23 +141,23 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
         await category.edit(name=f"Lobby #{lobby_id}")
 
-        guild_maps = await db.get_guild_maps(guild)
+        guild_maps = await db.get_guild_maps(guild, game_mode.value)
         lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
         await db.insert_lobby_maps(lobby_id, guild_maps[:7])
 
         await self.update_queue_msg(lobby_model)
 
         embed = Embed(
-            description=f"Lobby #{lobby_id} has been successfully created.")
+            description=f"Lobby #{lobby_id} created successfully.")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(
-        name='remove-lobby',
-        description='Remove the provided lobby.'
+        name='delete-lobby',
+        description='delete the provided lobby.'
     )
     @app_commands.describe(lobby_id="Lobby ID.")
     @app_commands.checks.has_permissions(administrator=True)
-    async def remove_lobby(self, interaction: Interaction, lobby_id: int):
+    async def delete_lobby(self, interaction: Interaction, lobby_id: int):
         """"""
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
@@ -228,10 +228,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         embed = Embed(description=f"Lobby #{lobby_model.id} has been emptied.")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(
-        name='modify-map-pool',
-        description='Modify map pool.'
-    )
+    @app_commands.command(name='edit-map-pool', description='Modify map pool')
     @app_commands.describe(lobby_id="Lobby ID.")
     @app_commands.checks.has_permissions(administrator=True)
     async def mpool(self, interaction: Interaction, lobby_id: int):
@@ -239,31 +236,96 @@ class LobbyCog(commands.Cog, name="Lobby"):
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
         user = interaction.user
+        embed = Embed()
+
         lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
-        if not lobby_model:
+        if not lobby_model or lobby_model.guild.id != guild.id:
             raise CustomError("Invalid Lobby ID")
 
-        if lobby_model.guild.id != guild.id:
-            raise CustomError("This lobby was not created in this server.")
-
-        guild_maps = await db.get_guild_maps(guild)
+        guild_maps = await db.get_guild_maps(guild, lobby_model.game_mode)
         lobby_maps = await db.get_lobby_maps(lobby_id)
-        mpool_menu = MapPoolView(lobby_model.id, user, guild_maps, lobby_maps)
-        await mpool_menu.start_mpool(interaction)
+        placeholder = "Select maps from the list"
+        options = [
+            SelectOption(
+                label=map_model.display_name,
+                value=map_model.map_id,
+                default=map_model in lobby_maps
+            ) for map_model in guild_maps
+        ]
+        dropdown = DropDownView(user, placeholder, options, 7, 7)
+        message = await interaction.followup.send(view=dropdown, wait=True)
+        await dropdown.wait()
 
-    @app_commands.command(
-        name='add-custom-map',
-        description='Add a custom map'
+        if dropdown.selected_options is None:
+            embed.description = "Timeout! Your haven't selected maps in time."
+            await message.edit(embed=embed, view=None)
+            return
+        
+        active_maps = list(filter(lambda x: str(x.map_id) in dropdown.selected_options, guild_maps))
+        await db.update_lobby_maps(lobby_id, active_maps, lobby_maps)
+
+        embed.description = f"Map pool for lobby **#{lobby_id}** updated successfully."
+        embed.add_field(name="Active Maps", value='\n'.join(m.display_name for m in active_maps))
+        await message.edit(embed=embed, view=None)
+
+    @app_commands.command(name="add-map", description="Add a custom map")
+    @app_commands.describe(
+        display_name="Display map name. e.g. Dust II",
+        dev_name="Map name in CS:GO. e.g. de_dust2",
     )
-    @app_commands.describe(display_name='Didsplay Name',
-                           dev_name='Map name in CS:GO')
+    @app_commands.choices(game_mode=GAME_MODE_CHOICES)
     @app_commands.checks.has_permissions(administrator=True)
-    async def add_custom_map(self, interaction: Interaction, display_name: str, dev_name: str):
+    async def add_custom_map(
+        self,
+        interaction: Interaction,
+        display_name: str,
+        dev_name: str,
+        game_mode: app_commands.Choice[str]
+    ):
         """"""
         await interaction.response.defer(ephemeral=True)
-        map_added = await db.create_custom_guild_map(interaction.guild, display_name, dev_name)
-        msg = 'Map added successfully' if map_added else 'Map already exists'
-        await interaction.followup.send(embed=Embed(description=msg), ephemeral=True)
+        embed = Embed()
+        guild_maps = await db.get_guild_maps(interaction.guild, game_mode.value)
+        count_maps = len(guild_maps)
+
+        if count_maps == 23:
+            raise CustomError("You have 23 maps, you cannot add more!")
+
+        map_added = await db.create_custom_guild_map(
+            interaction.guild, display_name, dev_name, game_mode.value
+        )
+
+        if map_added:
+            embed.description = f"Map **{display_name}** added successfully `{count_maps + 1}/23`"
+        else:
+            embed.description = f"Map **{display_name}** already exists `{count_maps}/23`"
+
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(name='remove-map', description='Remove a custom map')
+    @app_commands.describe(dev_name='Map name in CS:GO. e.g. de_dust2')
+    @app_commands.choices(game_mode=GAME_MODE_CHOICES)
+    @app_commands.checks.has_permissions(administrator=True)
+    async def remove_custom_map(
+        self,
+        interaction: Interaction,
+        dev_name: str,
+        game_mode: app_commands.Choice[str]
+    ):
+        """"""
+        await interaction.response.defer(ephemeral=True)
+        guild_maps = await db.get_guild_maps(interaction.guild, game_mode.value)
+        count_maps = len(guild_maps)
+        guild_maps = list(filter(lambda x: x.dev_name == dev_name, guild_maps))
+
+        if not guild_maps:
+            raise CustomError("Map not exist!")
+
+        await db.delete_guild_maps(interaction.guild, guild_maps, game_mode.value)
+
+        description = f'Map removed successfully `{count_maps-1}/23`'
+        embed = Embed(description=description)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, user: Member, before: VoiceState, after: VoiceState):
@@ -284,7 +346,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
         if after.channel is not None:
             lobby_model = await db.get_lobby_by_voice_channel(after.channel)
-            if lobby_model and not self.awaiting[lobby_model.id]:
+            if lobby_model and lobby_model.text_channel and not self.awaiting[lobby_model.id]:
                 self.awaiting[lobby_model.id] = True
                 try:
                     await self._join(user, lobby_model)
@@ -316,26 +378,39 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
                 try:
                     queue_msg = await lobby_model.text_channel.fetch_message(lobby_model.message_id)
-                    await queue_msg.delete()
-                except Exception as e:
-                    pass
+                except HTTPException as e:
+                    embed = Embed(description="Lobby message")
+                    queue_msg = await lobby_model.text_channel.send(embed=embed)
 
                 unreadied_users = []
                 if not lobby_model.auto_ready:
-                    menu = ReadyView(queued_users)
-                    ready_users = await menu.ready_up(lobby_model.text_channel)
-                    unreadied_users = set(queued_users) - ready_users
+                    mentions_msg = await lobby_model.text_channel.send(''.join(u.mention for u in queued_users))
+                    ready_view = ReadyView(queued_users, queue_msg)
+                    await queue_msg.edit(embed=ready_view._embed_ready(), view=ready_view)
+                    await ready_view.wait()
+                    unreadied_users = set(queued_users) - ready_view.ready_users
+                    try:
+                        await mentions_msg.delete()
+                    except Exception as e:
+                        pass
+
+                try:
+                    await queue_msg.delete()
+                except Exception as e:
+                    pass
 
                 if unreadied_users:
                     await db.delete_lobby_users(lobby_model.id, unreadied_users)
                     await self.move_to_channel(guild_model.prematch_channel, unreadied_users)
                 else:
+                    embed = Embed(description='Starting match setup...')
+                    setup_match_msg = await lobby_model.text_channel.send(embed=embed)
+
                     map_pool = await db.get_lobby_maps(lobby_model.id)
                     match_cog = self.bot.get_cog('Match')
-                    match_msg = await lobby_model.text_channel.send(embed=Embed(description='Starting match setup...'))
                     match_started = await match_cog.start_match(
                         lobby_model.guild,
-                        match_msg,
+                        setup_match_msg,
                         map_pool,
                         queue_users=queued_users,
                         game_mode=lobby_model.game_mode,
@@ -349,7 +424,6 @@ class LobbyCog(commands.Cog, name="Lobby"):
                         await self.move_to_channel(guild_model.prematch_channel, queued_users)
 
                     await db.clear_lobby_users(lobby_model.id)
-                return
 
         await self.update_queue_msg(lobby_model, title)
 
@@ -386,7 +460,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
         embed = self._embed_queue(
             title, lobby_model, queued_users)
-        await queue_message.edit(embed=embed)
+        await queue_message.edit(embed=embed, view=None)
 
     def _embed_queue(self, title: str, lobby_model: LobbyModel, queued_users: List[Member]):
         """"""
@@ -420,7 +494,6 @@ class LobbyCog(commands.Cog, name="Lobby"):
             except HTTPException as e:
                 self.bot.logger.warning(
                     f"Unable to move user \"{user.display_name}\" to voice channel \"{channel.name}\": {e.text}")
-                pass
 
 
 async def setup(bot: G5Bot):

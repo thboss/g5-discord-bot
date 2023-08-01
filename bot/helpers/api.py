@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Literal, Union, Optional, List, Dict
 
 from bot.helpers.db import db
-from bot.helpers.config_reader import Config
+from bot.helpers.configs import Config
 from bot.helpers.errors import APIError, AuthError
 
 
