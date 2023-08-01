@@ -36,8 +36,9 @@ class TeamCog(commands.Cog, name="Team"):
             raise CustomError(f"You already belong to team **{user_team.name}**")
         
         dict_user = { user_model.steam: {
-            'nickname': user.display_name,
-            'captain': True
+            'name': user.display_name,
+            'captain': True,
+            'coach': False,
         }}
         team_id = await api.create_team(team_name, dict_user)
 
