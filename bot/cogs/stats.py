@@ -73,11 +73,11 @@ class StatsCog(commands.Cog, name="Stats"):
                               for player in leaderboard],
                 ['Wins'] + [str(player.wins) for player in leaderboard],
                 ['Rating'] + [str(player.rating) for player in leaderboard]]
-        data[0] = [name if len(name) < 12 else name[:9] +
+        data[0] = [name if len(name) < 11 else name[:8] +
                    '...' for name in data[0]]  # Shorten long names
         widths = list(map(lambda x: len(max(x, key=len)), data))
         aligns = ['left', 'center', 'center',
-                  'center', 'center', 'center', 'right']
+                  'center', 'center', 'center', 'center']
         z = zip(data, widths, aligns)
         formatted_data = [list(map(lambda x: align_text(
             x, width, align), col)) for col, width, align in z]
