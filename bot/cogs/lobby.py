@@ -10,7 +10,7 @@ from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPEx
 from bot.helpers.db import db
 from bot.helpers.models import LobbyModel
 from bot.helpers.errors import CustomError, JoinLobbyError
-from bot.views import ReadyView, MapPoolView, DropDownView
+from bot.views import ReadyView, DropDownView
 from bot.bot import G5Bot
 from bot.helpers.utils import COUNTRY_FLAGS
 
