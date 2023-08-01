@@ -11,7 +11,7 @@ from bot.helpers.api import api
 from bot.views import ConfirmView, DropDownView
 
 
-class TeamCog(commands.Cog):
+class TeamCog(commands.Cog, name="Team"):
     """"""
 
     def __init__(self, bot):
