@@ -53,7 +53,7 @@ class G5Bot(commands.AutoShardedBot):
                 f'Unhandled exception in "{interaction.command.name}" command: ', error)
 
         embed = Embed(description=description, color=0xE02B2B)
-        await interaction.followup.send(embed=embed, ephemeral=True, view=None)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     def log_exception(self, msg, error):
         """ Logs an exception. """
