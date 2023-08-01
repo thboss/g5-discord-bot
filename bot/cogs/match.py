@@ -134,9 +134,8 @@ class MatchCog(commands.Cog, name="Match"):
 
         embed.description = "Starting match setup..."
         await message.edit(embed=embed, view=None)
-        match_cog = self.bot.get_cog("Match")
         map_pool = await db.get_guild_maps(guild, game_mode.value)
-        await match_cog.start_match(
+        await self.start_match(
             guild,
             message,
             map_pool,
@@ -271,9 +270,8 @@ class MatchCog(commands.Cog, name="Match"):
             else:
                 embed.description = "Starting match setup..."
                 await message.edit(embed=embed, view=None)
-                match_cog = self.bot.get_cog("Match")
                 map_pool = await db.get_guild_maps(guild, game_mode.value)
-                await match_cog.start_match(
+                await self.start_match(
                     guild,
                     message,
                     map_pool,
