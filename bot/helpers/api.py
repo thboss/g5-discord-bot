@@ -128,14 +128,6 @@ class Server:
         self.public_server = server_data['public_server']
         self.in_use = server_data['in_use']
 
-    @property
-    def connect_info(self):
-        """"""
-        connect_url = f'steam://connect/{self.ip_string}:{self.port}'
-        connect_command = f'connect {self.ip_string}:{self.port}'
-        connect_gotv = f'GOTV: steam://connect/{self.ip_string}:{self.gotv_port}\n\n'
-        return f'{connect_command}\n{connect_url}\n\n' + connect_gotv
-
     @classmethod
     def from_dict(cls, data: dict) -> "Server":
         return cls(data)

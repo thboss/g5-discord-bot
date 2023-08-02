@@ -563,7 +563,8 @@ class MatchCog(commands.Cog, name="Match"):
         description = ''
 
         if game_server:
-            description += game_server.connect_info
+            description += f'Server: `connect {game_server.ip_string}:{game_server.port}`\n\n' \
+                           f'GOTV: `connect {game_server.ip_string}:{game_server.gotv_port}`\n\n'
 
         for mapstat in mapstats:
             if mapstat.start_time:
