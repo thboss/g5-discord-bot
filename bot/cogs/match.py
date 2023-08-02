@@ -51,27 +51,43 @@ class MatchCog(commands.Cog, name="Match"):
         team_capacity = int(capacity.value // 2)
         embed = Embed()
 
-        guild_teams = await db.get_guild_teams(guild)
-        if len(guild_teams) < 2:
-            raise CustomError("No teams found in the server.")
-        
-        placeholder = "Choose two teams"
-        options = [SelectOption(label=f"Team {team.name}", value=team.id) for team in guild_teams]
-        dropdown = DropDownView(user, placeholder, options, 2, 2)
+        guild_maps = await db.get_guild_maps(guild, game_mode.value)
+        if len(guild_maps) < 7:
+            raise CustomError("No maps found in the server. Please add **atleast 7** maps using command `/add-map`.")
+
+        placeholder = "Select map pool"
+        options = [SelectOption(label=m.display_name, value=m.map_id) for m in guild_maps]
+        max_maps = len(guild_maps) if series.value == "bo1" else 7
+        dropdown = DropDownView(user, placeholder, options, 7, max_maps)
         message = await interaction.followup.send(view=dropdown, wait=True)
         await dropdown.wait()
 
         if not dropdown.selected_options:
-            embed.description = f"Timeout! You haven't selected teams in time!"
+            embed.description = "Timeout! You haven't selected maps in time!"
+            await message.edit(embed=embed, view=None)
+            return
+        
+        map_pool = list(filter(lambda x: str(x.map_id) in dropdown.selected_options, guild_maps))
+
+        guild_teams = await db.get_guild_teams(guild)
+        if len(guild_teams) < 2:
+            embed.description = "No teams found in the server."
+            await message.edit(embed=embed, view=None)
+            return
+        
+        placeholder = "Choose two teams"
+        options = [SelectOption(label=f"Team {team.name}", value=team.id) for team in guild_teams]
+        dropdown = DropDownView(user, placeholder, options, 2, 2)
+        await message.edit(view=dropdown)
+        await dropdown.wait()
+
+        if not dropdown.selected_options:
+            embed.description = "Timeout! You haven't selected teams in time!"
             await message.edit(embed=embed, view=None)
             return
         
         team1_model = await db.get_team_by_id(int(dropdown.selected_options[0]), self.bot)
         team2_model = await db.get_team_by_id(int(dropdown.selected_options[1]), self.bot)
-        if not team1_model or not team2_model:
-            embed.description = "One of teams has been deleted while setting up the match."
-            await message.edit(embed=embed, view=None)
-            return
         
         team1_users = await db.get_team_users(team1_model.id, guild)
         mention = await channel.send(team1_model.captain.mention)
@@ -87,7 +103,6 @@ class MatchCog(commands.Cog, name="Match"):
             await message.edit(embed=embed, view=None)
             return
 
-        team1_users = await db.get_team_users(team1_model.id, guild)
         team1_users = list(filter(lambda x: str(x.id) in dropdown.selected_options, team1_users))
 
         team2_users = await db.get_team_users(team2_model.id, guild)
@@ -103,21 +118,8 @@ class MatchCog(commands.Cog, name="Match"):
             embed.description = f"Timeout! Captain {team2_model.captain.mention} has not selected their team in time!"
             await message.edit(embed=embed, view=None)
             return
-        
-        team1_model = await db.get_team_by_id(team1_model.id, self.bot)
-        team2_model = await db.get_team_by_id(team2_model.id, self.bot)
-        if not team1_model or not team2_model:
-            embed.description = "One of teams has been deleted while setting up the match."
-            await message.edit(embed=embed, view=None)
-            return
 
-        team2_users = await db.get_team_users(team2_model.id, guild)
         team2_users = list(filter(lambda x: str(x.id) in dropdown.selected_options, team2_users))
-
-        if len(team1_users) != team_capacity or len(team2_users) != team_capacity:
-            embed.description = "Some users left their team while setting up. Please try again."
-            await message.edit(embed=embed, view=None)
-            return
         
         match_users = team1_users + team2_users
         mention = await channel.send(''.join(u.mention for u in match_users))
@@ -134,7 +136,6 @@ class MatchCog(commands.Cog, name="Match"):
 
         embed.description = "Starting match setup..."
         await message.edit(embed=embed, view=None)
-        map_pool = await db.get_guild_maps(guild, game_mode.value)
         await self.start_match(
             guild,
             message,
@@ -179,36 +180,55 @@ class MatchCog(commands.Cog, name="Match"):
         team1_match = await db.get_team_match(team1_model.id, guild)
         if team1_match:
             raise CustomError(f"Your team **{team1_model.name}** is already in match **#{team1_match.id}**")
+        
+        team1_users = await db.get_team_users(team1_model.id, guild)
+        if len(team1_users) < team_capacity:
+            raise CustomError(f"Your team **{team1_model.name}** has only {len(team1_users)} players.")
 
-        guild_teams = await db.get_guild_teams(guild)
-        guild_teams = [team for team in guild_teams if team.id != team1_model.id]
-        if not guild_teams:
-            raise CustomError("No teams found in the server.")
+        guild_maps = await db.get_guild_maps(guild, game_mode.value)
+        if len(guild_maps) < 7:
+            raise CustomError("No maps found in the server.")
 
-        placeholder = "Choose a team to challenge"
-        options = [SelectOption(label=f"Team {team.name}", value=team.id) for team in guild_teams]
-        dropdown = DropDownView(user, placeholder, options, 1, 1)
+        placeholder = "Select map pool"
+        options = [SelectOption(label=m.display_name, value=m.map_id) for m in guild_maps]
+        max_maps = len(guild_maps) if series.value == "bo1" else 7
+        dropdown = DropDownView(user, placeholder, options, 7, max_maps)
         message = await interaction.followup.send(view=dropdown, wait=True)
         await dropdown.wait()
 
         if not dropdown.selected_options:
-            embed.description = f"Timeout! You haven't selected a team in time!"
+            embed.description = f"Timeout! You haven't selected maps in time!"
+            await message.edit(embed=embed, view=None)
+            return
+        
+        map_pool = list(filter(lambda x: str(x.map_id) in dropdown.selected_options, guild_maps))
+
+        guild_teams = await db.get_guild_teams(guild)
+        guild_teams = [team for team in guild_teams if team.id != team1_model.id]
+        if not guild_teams:
+            embed.description = "No teams found in the server."
+            await message.edit(embed=embed, view=None)
+            return
+
+        placeholder = "Choose a team to challenge"
+        options = [SelectOption(label=f"Team {team.name}", value=team.id) for team in guild_teams]
+        dropdown = DropDownView(user, placeholder, options, 1, 1)
+        await message.edit(view=dropdown)
+        await dropdown.wait()
+
+        if not dropdown.selected_options:
+            embed.description = "Timeout! You haven't selected a team in time!"
             await message.edit(embed=embed, view=None)
             return
         
         team2_model = await db.get_team_by_id(int(dropdown.selected_options[0]), self.bot)
-        if not team2_model:
-            embed.description = "Team not found."
-            await message.edit(embed=embed, view=None)
-            return
         
         team2_match = await db.get_team_match(team2_model.id, guild)
         if team2_match:
             embed.description = f"Team **{team2_model.name}** is already in match **#{team2_match.id}**"
             await message.edit(embed=embed, view=None)
             return
-        
-        team1_users = await db.get_team_users(team1_model.id, guild)
+
         mention = await channel.send(team1_model.captain.mention)
         placeholder = "Choose your team players"
         options = [SelectOption(label=user.display_name, value=user.id) for user in team1_users]
@@ -222,8 +242,8 @@ class MatchCog(commands.Cog, name="Match"):
             await message.edit(embed=embed, view=None)
             return
         
-        team1_users = await db.get_team_users(team1_model.id, guild)
         team1_users = list(filter(lambda x: str(x.id) in dropdown.selected_options, team1_users))
+
         embed.description = f"Team **{team1_model.name}** wants to challenge your team **{team2_model.name}**"
         mention = await channel.send(team2_model.captain.mention)
         confirm = ConfirmView(team2_model.captain)
@@ -245,18 +265,13 @@ class MatchCog(commands.Cog, name="Match"):
             await mention.delete()
 
             if not dropdown.selected_options:
-                embed.description = f"Timeout! Captain {team2_model.captain.mention} haven't selected their team in time!"
+                embed.description = f"Timeout! Captain {team2_model.captain.mention} has not selected their team in time!"
                 await message.edit(embed=embed, view=None)
                 return
     
-            team2_users = await db.get_team_users(team2_model.id, guild)
             team2_users = list(filter(lambda x: str(x.id) in dropdown.selected_options, team2_users))
-            if len(team1_users) != team_capacity or len(team2_users) != team_capacity:
-                embed.description = "Some users left their team while setting up. Please try again."
-                await message.edit(embed=embed, view=None)
-                return
-
             match_users = team1_users + team2_users
+
             mention = await channel.send(''.join(u.mention for u in match_users))
             ready_view = ReadyView(match_users, message)
             await message.edit(embed=ready_view._embed_ready(), view=ready_view)
@@ -291,10 +306,6 @@ class MatchCog(commands.Cog, name="Match"):
         await interaction.response.defer()
         await api.cancel_match(match_id)
         embed = Embed(description=f"Match #{match_id} canceled successfully.")
-        match_model = await db.get_match_by_id(match_id, self.bot)
-        guild_model = await db.get_guild_by_id(interaction.guild.id, self.bot)
-        if match_model:
-            await self.finalize_match(match_model, guild_model)
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="restart-match", description="Restart a live match")
@@ -636,7 +647,7 @@ class MatchCog(commands.Cog, name="Match"):
                 team2_id = await api.create_team(team2_name, dict_team2_users)
 
             if map_method == 'veto':
-                veto_view = VetoView(message, mpool[:7], series, team1_captain, team2_captain)
+                veto_view = VetoView(message, mpool, series, team1_captain, team2_captain)
                 await message.edit(embed=veto_view.embed_veto(), view=veto_view)
                 await veto_view.wait()
                 if not veto_view.is_veto_done:
