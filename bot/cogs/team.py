@@ -148,6 +148,9 @@ class TeamCog(commands.Cog, name="Team"):
         if not user_team:
             raise CustomError("You are not belong to any team.")
         
+        if user_team.captain == user:
+            raise CustomError(f"You are the captain of team **{user_team.name}**! Please use command `/delete-team` instead.")
+        
         team_match = await db.get_team_match(user_team.id, guild)
         if team_match:
             raise CustomError(f"You cannot leave right now. Your team **{user_team.name}** belongs to match **#{team_match.id}**")
