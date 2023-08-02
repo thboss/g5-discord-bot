@@ -28,6 +28,10 @@ class G5Bot(commands.AutoShardedBot):
 
     async def on_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         """ Executed every time a slash command catches an error. """
+        try:
+            await interaction.response.defer()
+        except:
+            pass
 
         if isinstance(error, app_commands.CommandOnCooldown):
             minutes, seconds = divmod(error.retry_after, 60)
