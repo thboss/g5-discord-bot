@@ -251,17 +251,12 @@ class APIManager:
             return resp.status
 
     @check_connection
-    async def add_team_member(self, team_id: int, steam_id: str, nickname: str, captain: bool = False):
+    async def add_team_member(self, team_id: int, user_dict: Dict[str, Dict[str, bool]]):
         """"""
         url = "/api/teams"
         data = {
             'id': team_id,
-            'auth_name': {
-                steam_id: {
-                    'name': nickname,
-                    'captain': captain
-                }
-            }
+            'auth_name': user_dict
         }
 
         async with self.session.put(url=url, json=[data]) as resp:
@@ -279,7 +274,7 @@ class APIManager:
         async with self.session.delete(url=url, json=[data]) as resp:
             if "/auth/steam" in str(resp.url):
                 raise AuthError
-            return resp.status < 400
+            return resp.status
 
     @check_connection
     async def get_server(self, server_id: int):
