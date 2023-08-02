@@ -58,7 +58,7 @@ class TeamCog(commands.Cog, name="Team"):
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="join-team", description="Join a team")
-    @app_commands.checks.cooldown(1, 300)
+    @app_commands.checks.cooldown(1, 180)
     async def join_team(self, interaction: Interaction):
         """"""
         await interaction.response.defer()
@@ -116,26 +116,13 @@ class TeamCog(commands.Cog, name="Team"):
                 embed.description = "You must be linked to join a team."
                 await message.edit(embed=embed, view=None)
                 return
-            
-            user_team = await db.get_user_team(user.id, guild)
-            if user_team:
-                embed.description = f"You already in team **{user_team.name}**"
-                await message.edit(embed=embed, view=None)
-                return
-            
-            team_model = await db.get_team_by_id(int(dropdown.selected_options[0]), self.bot)
-            if not team_model:
-                embed.description = "Team not found!"
-                await message.edit(embed=embed, view=None)
-                return
-            
-            team_users = await db.get_team_users(team_model.id, guild)
-            if len(team_users) > 5:
-                embed.description = f"Team **{team_model.name}** is full!"
-                await message.edit(embed=embed, view=None)
-                return
 
-            added = await api.add_team_member(team_model.id, user_model.steam, user.display_name)
+            dict_user = { user_model.steam: {
+                'name': user.display_name[:30],
+                'captain': False,
+                'coach': False,
+            }}
+            added = await api.add_team_member(team_model.id, dict_user)
             if added:
                 await db.insert_team_users(team_model.id, [user])
                 try:
@@ -166,8 +153,8 @@ class TeamCog(commands.Cog, name="Team"):
             raise CustomError(f"You cannot leave right now. Your team **{user_team.name}** belongs to match **#{team_match.id}**")
         
         user_model = await db.get_user_by_discord_id(user.id, self.bot)
-        removed = await api.remove_team_member(user_team.id, user_model.steam)
-        if removed:
+        status_code = await api.remove_team_member(user_team.id, user_model.steam)
+        if status_code < 400 or status_code == 404:
             await db.delete_team_users(user_team.id, [user])
             try:
                 await user.remove_roles(user_team.role)
@@ -179,7 +166,7 @@ class TeamCog(commands.Cog, name="Team"):
         else:
             embed.description = "Something went wrong in API call. Please try again later."
 
-        await interaction.followup.send(embed=embed, view=None)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="kick-teammate", description="Kick a user from your team")
     async def kick_teammate(self, interaction: Interaction):
@@ -192,6 +179,10 @@ class TeamCog(commands.Cog, name="Team"):
         team_model = await db.get_user_team(user.id, guild)
         if not team_model or team_model.captain != user:
             raise CustomError("Only team captains can access this!")
+        
+        team_match = await db.get_team_match(team_model.id, guild)
+        if team_match:
+            raise CustomError(f"Unable to kick your team players while your team belongs to live match **#{team_match.id}**")
         
         team_users = await db.get_team_users(team_model.id, guild)
         team_users = [u for u in team_users if u != user]
@@ -210,19 +201,13 @@ class TeamCog(commands.Cog, name="Team"):
             await message.edit(embed=embed, view=None)
             return
         
-        team_match = await db.get_team_match(team_model.id, guild)
-        if team_match:
-            embed.description = f"Unable to kick your team players while your team belongs to live match **#{team_match.id}**"
-            await message.edit(embed=embed, view=None)
-            return
-        
         users_to_kick = list(filter(lambda x: str(x.id) in dropdown.selected_options, team_users))
         kicked_users = []
         users_model = await db.get_users(users_to_kick)
         for usr in users_model:
             try:
-                deleted = await api.remove_team_member(team_model.id, usr.steam)
-                if deleted:
+                status_code = await api.remove_team_member(team_model.id, usr.steam)
+                if status_code < 400 or status_code == 404:
                     await db.delete_team_users(team_model.id, [usr.user])
                     kicked_users.append(usr.user)
                     await usr.user.remove_roles(team_model.role)
@@ -249,6 +234,10 @@ class TeamCog(commands.Cog, name="Team"):
         user_team = await db.get_user_team(user.id, guild)
         if not user_team or user_team.captain != user:
             raise CustomError("Only team captains can access this!")
+
+        team_match = await db.get_team_match(user_team.id, guild)
+        if team_match:
+            raise CustomError(f"Unable to delete your team while it belongs to live match **#{team_match.id}**")
         
         embed.description = f"Are you sure you want to delete your team **{user_team.name}**?"
         confirm = ConfirmView(user)
@@ -258,12 +247,6 @@ class TeamCog(commands.Cog, name="Team"):
         if confirm.accepted is None:
             embed.description = "Timeout! You haven't decided in time."
         elif confirm.accepted:
-            team_match = await db.get_team_match(user_team.id, guild)
-            if team_match:
-                embed.description = f"Unable to delete your team while it belongs to live match **#{team_match.id}**"
-                await message.edit(embed=embed, view=None)
-                return
-
             team_users = await db.get_team_users(user_team.id, guild)
             status_code = await api.delete_team(user_team.id)
             if status_code < 400 or status_code == 404:

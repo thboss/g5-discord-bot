@@ -252,7 +252,8 @@ class LobbyCog(commands.Cog, name="Lobby"):
                 default=map_model in lobby_maps
             ) for map_model in guild_maps
         ]
-        dropdown = DropDownView(user, placeholder, options, 7, 7)
+        max_maps = len(guild_maps) if lobby_model.series == "bo1" else 7
+        dropdown = DropDownView(user, placeholder, options, 7, max_maps)
         message = await interaction.followup.send(view=dropdown, wait=True)
         await dropdown.wait()
 
