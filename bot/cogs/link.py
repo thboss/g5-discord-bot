@@ -54,15 +54,20 @@ class LinkCog(commands.Cog, name='Link'):
         if not user_model:
             raise CustomError("Your account is not linked to Steam.")
 
-        lobby_model = await db.get_user_lobby(user.id, interaction.guild)
-        if lobby_model:
+        user_lobby = await db.get_user_lobby(user.id, interaction.guild)
+        if user_lobby:
             raise CustomError(
-                f"You can't unlink your account while you are in Lobby #{lobby_model.id}.")
+                f"You can't unlink your account while you are in Lobby #{user_lobby.id}.")
 
-        match_model = await db.get_user_match(user.id, interaction.guild)
-        if match_model:
+        user_match = await db.get_user_match(user.id, interaction.guild)
+        if user_match:
             raise CustomError(
-                f"You can't unlink your account while you are in match #{match_model.id}")
+                f"You can't unlink your account while you are in match #{user_match.id}")
+
+        user_team = await db.get_user_team(user.id, interaction.guild)
+        if user_team:
+            raise CustomError(
+                f"You can't unlink your account while you are in team #{user_team.id}")
 
         try:
             await db.delete_user(user.id)
