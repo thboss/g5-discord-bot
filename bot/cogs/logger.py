@@ -11,6 +11,7 @@ import discord
 from discord.ext import commands
 
 from ..helpers.utils import indent
+from ..helpers.configs import Config
 
 
 class ConsoleFormatter(logging.Formatter):
@@ -66,13 +67,13 @@ LOGGING_CONFIG = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'color',
-            'level': 'INFO',
+            'level': 'DEBUG',
             'stream': 'ext://sys.stdout'
         },
         'file': {
             'class': 'logging.handlers.RotatingFileHandler',
             'formatter': 'default',
-            'level': 'INFO',
+            'level': 'DEBUG',
             'filename': os.path.join(os.path.dirname(os.path.abspath(__main__.__file__)), 'bot.log'),
             'maxBytes': 7340032,
             'encoding': 'utf-8'
@@ -80,13 +81,13 @@ LOGGING_CONFIG = {
     },
     'loggers': {
         'Bot': {
-            'level': 'DEBUG'
+            'level': 'DEBUG' if Config.debug else 'INFO',
         },
         'API': {
-            'level': 'DEBUG'
+            'level': 'DEBUG' if Config.debug else 'INFO',
         },
         'DB': {
-            'level': 'DEBUG'
+            'level': 'DEBUG' if Config.debug else 'INFO',
         },
         'discord.client': {
             'level': 'INFO'
