@@ -1,7 +1,7 @@
 # team.py
 
 from discord.ext import commands
-from discord import app_commands, Interaction, Embed, SelectOption
+from discord import app_commands, Interaction, Embed, SelectOption, Role
 from discord.interactions import Interaction
 
 
@@ -55,11 +55,12 @@ class TeamCog(commands.Cog, name="Team"):
         await user.add_roles(team_role)
 
         embed = Embed(description=f"Team **{team_name}** created successfully")
-        await interaction.followup.send(embed=embed)
+        await interaction.edit_original_response(embed=embed)
 
     @app_commands.command(name="join-team", description="Join a team")
+    @app_commands.describe(team_role="Mention team role")
     @app_commands.checks.cooldown(1, 180)
-    async def join_team(self, interaction: Interaction):
+    async def join_team(self, interaction: Interaction, team_role: Role):
         """"""
         await interaction.response.defer()
         user = interaction.user
@@ -73,50 +74,25 @@ class TeamCog(commands.Cog, name="Team"):
         user_team = await db.get_user_team(user.id, guild)
         if user_team:
             raise CustomError(f"You already in team **{user_team.name}**")
-        
-        guild_teams = await db.get_guild_teams(guild)
-        if not guild_teams:
-            raise CustomError("No teams found in the server.")
-    
-        placeholder = "Choose a team"
-        options = [SelectOption(label=f"Team {team.name}", value=team.id) for team in guild_teams]
-        dropdown = DropDownView(user, placeholder, options, 1, 1)
-        message = await interaction.followup.send(view=dropdown, wait=True)
-        await dropdown.wait()
 
-        if not dropdown.selected_options:
-            embed.description = f"Timeout! haven't selected team in time."
-            await message.edit(embed=embed, view=None)
-            return
-
-        team_model = await db.get_team_by_id(int(dropdown.selected_options[0]), self.bot)
+        team_model = await db.get_team_by_role(team_role, self.bot)
         if not team_model:
-            embed.description = "Team not found!"
-            await message.edit(embed=embed, view=None)
-            return
+            raise CustomError("Team not found!")
 
         team_users = await db.get_team_users(team_model.id, guild)
         if len(team_users) > 5:
-            embed.description = "Team **{}** is full!"
-            await message.edit(embed=embed, view=None)
-            return
+            raise CustomError(f"Team **{team_model.name}** is full!")
 
         embed.description = f"User {user.mention} wants to join your team **{team_model.name}**"
         confirm_view = ConfirmView(team_model.captain)
         mention_msg = await interaction.channel.send(content=team_model.captain.mention)
-        await message.edit(embed=embed, view=confirm_view)
+        await interaction.edit_original_response(embed=embed, view=confirm_view)
         await confirm_view.wait()
         await mention_msg.delete()
 
         if confirm_view.accepted is None:
             embed.description = "Timeout! The join request was not accepted."
         elif confirm_view.accepted:
-            user_model = await db.get_user_by_discord_id(user.id, self.bot)
-            if not user_model or not user_model.steam:
-                embed.description = "You must be linked to join a team."
-                await message.edit(embed=embed, view=None)
-                return
-
             dict_user = { user_model.steam: {
                 'name': user.display_name[:30],
                 'captain': False,
@@ -130,11 +106,11 @@ class TeamCog(commands.Cog, name="Team"):
                 except: pass
                 embed.description = f"{user.mention} You have joined team **{team_model.name}**."
             else:
-                embed.description = "Something went wrong in API call. Please try again later."
+                raise CustomError
         else:
             embed.description = "Join team request rejected. Maybe next time!"
 
-        await message.edit(embed=embed, view=None)
+        await interaction.edit_original_response(embed=embed, view=None)
     
     @app_commands.command(name="leave-team", description="Leave your team")
     async def leave_team(self, interaction: Interaction):
@@ -167,9 +143,9 @@ class TeamCog(commands.Cog, name="Team"):
                 await interaction.channel.send(content=user_team.captain.mention, embed=embed)
             embed.description = f"You have been removed from team **{user_team.name}**."
         else:
-            embed.description = "Something went wrong in API call. Please try again later."
+            raise CustomError
 
-        await interaction.followup.send(embed=embed)
+        await interaction.edit_original_response(embed=embed, view=None)
 
     @app_commands.command(name="kick-teammate", description="Kick a user from your team")
     async def kick_teammate(self, interaction: Interaction):
@@ -196,13 +172,11 @@ class TeamCog(commands.Cog, name="Team"):
         placeholder = "Choose players to be kicked from your team"
         options = [SelectOption(label=user.display_name, value=user.id) for user in team_users]
         dropdown = DropDownView(user, placeholder, options, 1, len(team_users))
-        message = await interaction.followup.send(view=dropdown, wait=True)
+        await interaction.edit_original_response(view=dropdown)
         await dropdown.wait()
 
         if not dropdown.selected_options:
-            embed.description = f"Timeout! haven't selected players in time."
-            await message.edit(embed=embed, view=None)
-            return
+            raise CustomError("Timeout! haven't selected players in time.")
         
         users_to_kick = list(filter(lambda x: str(x.id) in dropdown.selected_options, team_users))
         kicked_users = []
@@ -222,9 +196,9 @@ class TeamCog(commands.Cog, name="Team"):
             await interaction.channel.send(mention_users)
             embed.description = f"Players {mention_users} have been kicked from team **{team_model.name}**"
         else:
-            embed.description = "Something went wrong in API call. Please try again later."
+            raise CustomError
 
-        await message.edit(embed=embed, view=None)
+        await interaction.edit_original_response(embed=embed, view=None)
 
     @app_commands.command(name="delete-team", description="Delete your team")
     async def delete_team(self, interaction: Interaction):
@@ -244,13 +218,12 @@ class TeamCog(commands.Cog, name="Team"):
         
         embed.description = f"Are you sure you want to delete your team **{user_team.name}**?"
         confirm = ConfirmView(user)
-        message = await interaction.followup.send(embed=embed, view=confirm, wait=True)
+        await interaction.edit_original_response(embed=embed, view=confirm)
         await confirm.wait()
 
         if confirm.accepted is None:
             embed.description = "Timeout! You haven't decided in time."
         elif confirm.accepted:
-            team_users = await db.get_team_users(user_team.id, guild)
             deleted = await api.delete_team(user_team.id)
             if not deleted:
                 is_team_found = await api.get_team(user_team.id)
@@ -262,14 +235,16 @@ class TeamCog(commands.Cog, name="Team"):
                     await user_team.role.delete()
                 except: pass
                 embed.description = f"Your team **{user_team.name}** has been deleted."
-                teammate_mentions = ''.join(u.mention for u in team_users)
-                await interaction.channel.send(teammate_mentions)
+                team_users = await db.get_team_users(user_team.id, guild)
+                if team_users:
+                    teammate_mentions = ''.join(u.mention for u in team_users)
+                    await interaction.channel.send(teammate_mentions)
             else:
-                embed.description = "Something went wrong in API call. Please try again later."
+                raise CustomError
         else:
             embed.description = "Delete team cancelled."
         
-        await message.edit(embed=embed, view=None)
+        await interaction.edit_original_response(embed=embed, view=None)
 
 
 async def setup(bot):
