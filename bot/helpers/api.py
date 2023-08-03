@@ -1,27 +1,16 @@
 # bot/helpers/api.py
 
-import discord
 import asyncio
 import logging
 import json
 import aiohttp
 from datetime import datetime
-from typing import Literal, Union, Optional, List, Dict
+from typing import Literal, Optional, List, Dict
+from discord import Member
 
 from bot.helpers.db import db
 from bot.helpers.configs import Config
-from bot.helpers.errors import APIError, AuthError
-
-
-def check_connection(func):
-    async def wrapper(*args, **kwargs):
-        try:
-            return await func(*args, **kwargs)
-        except (AuthError, APIError) as e:
-            raise APIError("API Error: " + e.message)
-        except Exception as e:
-            raise APIError("API connection error!")
-    return wrapper
+from bot.helpers.errors import APIError
 
 
 class Match:
@@ -156,14 +145,14 @@ async def start_request_log(session, ctx, params):
     """"""
     ctx.start = asyncio.get_event_loop().time()
     logger = logging.getLogger('API')
-    logger.info(f'Sending {params.method} request to {params.url}')
+    logger.debug(f'Sending {params.method} request to {params.url}')
 
 
 async def end_request_log(session, ctx, params):
     """"""
     logger = logging.getLogger('API')
     elapsed = asyncio.get_event_loop().time() - ctx.start
-    logger.info(f'Response received from {params.url} ({elapsed:.2f}s)\n'
+    logger.debug(f'Response received from {params.url} ({elapsed:.2f}s)\n'
                 f'    Status: {params.response.status}\n'
                 f'    Reason: {params.response.reason}')
     try:
@@ -183,11 +172,6 @@ class APIManager:
     def __init__(self):
         self.logger = logging.getLogger("API")
 
-        # Register trace config handlers
-        trace_config = aiohttp.TraceConfig()
-        trace_config.on_request_start.append(start_request_log)
-        trace_config.on_request_end.append(end_request_log)
-
     def connect(self, loop):
         self.logger.info('Starting API helper client session')
         self.session = aiohttp.ClientSession(
@@ -196,7 +180,7 @@ class APIManager:
             headers={"user-api": Config.api_key},
             json_serialize=lambda x: json.dumps(x, ensure_ascii=False),
             timeout=aiohttp.ClientTimeout(total=30),
-            trace_configs=[TRACE_CONFIG]
+            trace_configs=[TRACE_CONFIG] if Config.debug else None
         )
 
     async def close(self):
@@ -204,16 +188,20 @@ class APIManager:
         self.logger.info('Closing API helper client session')
         await self.session.close()
 
-    @check_connection
-    async def get_team(self, team_id: int):
+    async def get_team(self, team_id: int) -> Optional[Team]:
         """"""
         url = f"/api/teams/{team_id}"
 
-        async with self.session.get(url=url) as resp:
-            resp_data = await resp.json()
-            return Team.from_dict(resp_data['team'])
+        try:
+            async with self.session.get(url=url) as resp:
+                resp_data = await resp.json()
+                if not resp.ok:
+                    return
+                return Team.from_dict(resp_data['team'])
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def create_team(self, name: str, users_dict: Dict[str, Dict[str, bool]]):
         """"""
         url = "/api/teams"
@@ -223,26 +211,35 @@ class APIManager:
             'auth_name': users_dict
         }
 
-        async with self.session.post(url=url, json=[data]) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            resp_data = await resp.json()
-            if resp.status >= 400:
-                raise APIError(resp_data['message'])
-            return resp_data['id']
+        try:
+            async with self.session.post(url=url, json=[data]) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key.")
+                resp_data = await resp.json()
+                if not resp.ok:
+                    raise ValueError(resp_data['message'])
+                return resp_data['id']
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def delete_team(self, team_id: int):
         """"""
         url = "/api/teams"
         data = {'team_id': team_id}
 
-        async with self.session.delete(url=url, json=[data]) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            return resp.status
+        try:
+            async with self.session.delete(url=url, json=[data]) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                await resp.json()
+                if not resp.ok:
+                    return False
+                return True
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def add_team_member(self, team_id: int, user_dict: Dict[str, Dict[str, bool]]):
         """"""
         url = "/api/teams"
@@ -251,10 +248,18 @@ class APIManager:
             'auth_name': user_dict
         }
 
-        async with self.session.put(url=url, json=[data]) as resp:
-            return resp.status < 400
+        try:
+            async with self.session.put(url=url, json=[data]) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                await resp.json()
+                if not resp.ok:
+                    return False
+                return True
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def remove_team_member(self, team_id: int, steam_id: str):
         """"""
         url = "/api/teams"
@@ -263,46 +268,66 @@ class APIManager:
             'steam_id': steam_id
         }
 
-        async with self.session.delete(url=url, json=[data]) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            return resp.status
+        try:
+            async with self.session.delete(url=url, json=[data]) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                await resp.json()
+                if not resp.ok:
+                    return False
+                return True
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def get_server(self, server_id: int):
         """"""
         url = f"/api/servers/{server_id}"
 
-        async with self.session.get(url=url) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            resp_data = await resp.json()
-            return Server.from_dict(resp_data['server'])
+        try:
+            async with self.session.get(url=url) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                resp_data = await resp.json()
+                if not resp.ok:
+                    raise ValueError(resp_data['message'])
+                return Server.from_dict(resp_data['server'])
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def get_servers(self):
         """"""
         url = "/api/servers/myservers"
+        try:
+            async with self.session.get(url=url) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                resp_data = await resp.json()
+                if not resp.ok:
+                    raise ValueError(resp_data['message'])
+                return [Server.from_dict(server) for server in resp_data['servers']]
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-        async with self.session.get(url=url) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            resp_data = await resp.json()
-            return [Server.from_dict(server) for server in resp_data['servers']]
-
-    @check_connection
     async def is_server_available(self, server_id: int):
-        """ 
-        """
+        """"""
         url = f"/api/servers/{server_id}/status"
 
-        async with self.session.get(url=url) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            return resp.status < 400
-
-    @check_connection
-    async def get_playerstat(self, user: discord.Member, bot) -> Optional[PlayerStat]:
+        try:
+            async with self.session.get(url=url) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                await resp.json()
+                if not resp.ok:
+                    return False
+                return True
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
+            
+    async def get_playerstat(self, user: Member, bot) -> Optional[PlayerStat]:
         """
         Retrieve players stats from the API PUG stats.
 
@@ -317,14 +342,18 @@ class APIManager:
             return
         url = f"/api/playerstats/{user_model.steam}/pug"
 
-        async with self.session.get(url=url) as resp:
-            if resp.status < 400:
+        try:
+            async with self.session.get(url=url) as resp:
                 resp_data = await resp.json()
+                if not resp.ok:
+                    return
                 resp_data["playerstats"]["name"] = user.display_name
                 return PlayerStat.from_dict(resp_data["playerstats"])
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
-    async def get_leaderboard(self, users: List[discord.Member]) -> List[PlayerStat]:
+    async def get_leaderboard(self, users: List[Member]) -> List[PlayerStat]:
         """
         Retrieve players stats from the PUG leaderboard API and matches them to the given list of discord.Member.
 
@@ -340,48 +369,51 @@ class APIManager:
         users_model = await db.get_users(users)
         db_steam_ids = [usr.steam for usr in users_model]
 
-        async with self.session.get(url=url) as resp:
-            resp_data = await resp.json()
-            if resp.status >= 400:
-                raise APIError(resp_data['message'])
-            players = list(
-                filter(lambda x: x['steamId'] in db_steam_ids, resp_data['leaderboard']))
-            api_steam_ids = [player['steamId'] for player in players]
+        try:
+            async with self.session.get(url=url) as resp:
+                resp_data = await resp.json()
+                if not resp.ok:
+                    return []
+                players = list(
+                    filter(lambda x: x['steamId'] in db_steam_ids, resp_data['leaderboard']))
+                api_steam_ids = [player['steamId'] for player in players]
 
-            for steam_id in db_steam_ids:
-                if steam_id not in api_steam_ids:
-                    players.append({
-                        "steamId": steam_id,
-                        "kills": 0,
-                        "deaths": 0,
-                        "assists": 0,
-                        "k1": 0,
-                        "k2": 0,
-                        "k3": 0,
-                        "k4": 0,
-                        "k5": 0,
-                        "v1": 0,
-                        "v2": 0,
-                        "v3": 0,
-                        "v4": 0,
-                        "v5": 0,
-                        "trp": 0,
-                        "fba": 0,
-                        "total_damage": 0,
-                        "hsk": 0,
-                        "hsp": 0.00,
-                        "average_rating": 0.00,
-                        "wins": 0,
-                        "total_maps": 0
-                    })
+                for steam_id in db_steam_ids:
+                    if steam_id not in api_steam_ids:
+                        players.append({
+                            "steamId": steam_id,
+                            "kills": 0,
+                            "deaths": 0,
+                            "assists": 0,
+                            "k1": 0,
+                            "k2": 0,
+                            "k3": 0,
+                            "k4": 0,
+                            "k5": 0,
+                            "v1": 0,
+                            "v2": 0,
+                            "v3": 0,
+                            "v4": 0,
+                            "v5": 0,
+                            "trp": 0,
+                            "fba": 0,
+                            "total_damage": 0,
+                            "hsk": 0,
+                            "hsp": 0.00,
+                            "average_rating": 0.00,
+                            "wins": 0,
+                            "total_maps": 0
+                        })
 
-            players.sort(key=lambda x: db_steam_ids.index(x['steamId']))
-            for idx, db_user in enumerate(users_model):
-                players[idx]['name'] = db_user.user.display_name
+                players.sort(key=lambda x: db_steam_ids.index(x['steamId']))
+                for idx, db_user in enumerate(users_model):
+                    players[idx]['name'] = db_user.user.display_name
 
-            return [PlayerStat.from_dict(player) for player in players]
+                return [PlayerStat.from_dict(player) for player in players]
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def get_mapstats(self, match_id: int):
         """
         Fetches map statistics for a match from the API server.
@@ -398,12 +430,17 @@ class APIManager:
 
         url = f"/api/mapstats/{match_id}"
 
-        async with self.session.get(url=url) as resp:
-            resp_data = await resp.json()
-            return [MapStat.from_dict(map_stat) for map_stat in resp_data['mapstats']]
+        try:
+            async with self.session.get(url=url) as resp:
+                resp_data = await resp.json()
+                if not resp.ok:
+                    return []
+                return [MapStat.from_dict(map_stat) for map_stat in resp_data['mapstats']]
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
-    async def get_match(self, match_id: int) -> Union["Match", None]:
+    async def get_match(self, match_id: int) -> Optional["Match"]:
         """
         Fetches a match from the API server.
 
@@ -420,12 +457,16 @@ class APIManager:
 
         url = f"/api/matches/{match_id}"
 
-        async with self.session.get(url=url) as resp:
-            if resp.status < 400:
+        try:
+            async with self.session.get(url=url) as resp:
                 resp_data = await resp.json()
+                if not resp.ok:
+                    return
                 return Match.from_dict(resp_data["match"])
-
-    @check_connection
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
+        
     async def create_match(
         self,
         server_id: int,
@@ -478,13 +519,18 @@ class APIManager:
             }
         }
 
-        async with self.session.post(url=url, json=[data]) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            resp_data = await resp.json()
-            return resp_data['id']
+        try:
+            async with self.session.post(url=url, json=[data]) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                resp_data = await resp.json()
+                if not resp.ok:
+                    raise ValueError(resp_data['message'])
+                return resp_data['id']
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def cancel_match(self, match_id: int):
         """
         Sends an HTTP GET request to cancel the match with the given ID.
@@ -501,15 +547,18 @@ class APIManager:
 
         url = f"/api/matches/{match_id}/cancel"
 
-        async with self.session.get(url=url) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            if resp.status >= 400:
-                resp_data = await resp.json()
-                raise APIError(resp_data['message'])
-            return True
+        try:
+            async with self.session.get(url=url) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                await resp.json()
+                if not resp.ok:
+                    return False
+                return True
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def restart_match(self, match_id: int):
         """
         Sends an HTTP GET request to restart the match with the given ID.
@@ -526,15 +575,18 @@ class APIManager:
 
         url = f"/api/matches/{match_id}/restart"
 
-        async with self.session.get(url=url) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            if resp.status >= 400:
-                resp_data = await resp.json()
-                raise APIError(resp_data['message'])
-            return True
-
-    @check_connection
+        try:
+            async with self.session.get(url=url) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                await resp.json()
+                if not resp.ok:
+                    return False
+                return True
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
+        
     async def pause_match(self, match_id: int):
         """
         Sends an HTTP GET request to pause a match with the given ID.
@@ -551,15 +603,18 @@ class APIManager:
 
         url = f"/api/matches/{match_id}/pause"
 
-        async with self.session.get(url=url) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            if resp.status >= 400:
-                resp_data = await resp.json()
-                raise APIError(resp_data['message'])
-            return True
+        try:
+            async with self.session.get(url=url) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                await resp.json()
+                if not resp.ok:
+                    return False
+                return True
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def unpause_match(self, match_id: int) -> bool:
         """
         Sends an HTTP GET request to unpause a match with the given ID.
@@ -576,15 +631,18 @@ class APIManager:
 
         url = f"/api/matches/{match_id}/unpause"
 
-        async with self.session.get(url=url) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            if resp.status >= 400:
-                resp_data = await resp.json()
-                raise APIError(resp_data['message'])
-            return True
+        try:
+            async with self.session.get(url=url) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                await resp.json()
+                if not resp.ok:
+                    return False
+                return True
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def add_match_player(
         self,
         match_id: int,
@@ -617,15 +675,18 @@ class APIManager:
             'nickname': nickname
         }
 
-        async with self.session.put(url=url, json=[data]) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            if resp.status >= 400:
-                resp_data = await resp.json()
-                raise APIError(resp_data['message'])
-            return True
+        try:
+            async with self.session.put(url=url, json=[data]) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                await resp.json()
+                if not resp.ok:
+                    return False
+                return True
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
-    @check_connection
     async def remove_match_player(self, match_id: int, steam_id: str):
         """
         Sends an HTTP PUT request to remove a player with the given Steam ID from the given match ID.
@@ -644,13 +705,16 @@ class APIManager:
         url = f"/api/matches/{match_id}/removeuser"
         data = {'steam_id': steam_id}
 
-        async with self.session.put(url=url, json=[data]) as resp:
-            if "/auth/steam" in str(resp.url):
-                raise AuthError
-            if resp.status >= 400:
-                resp_data = await resp.json()
-                raise APIError(resp_data['message'])
-            return True
-
+        try:
+            async with self.session.put(url=url, json=[data]) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                await resp.json()
+                if not resp.ok:
+                    return False
+                return True
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
 api = APIManager()

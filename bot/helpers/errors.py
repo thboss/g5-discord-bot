@@ -5,7 +5,9 @@ from discord import Member
 class CustomError(AppCommandError):
     """ A custom error that is raised when a command encountres an issue. """
 
-    def __init__(self, message: str):
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Unknown error occurred."
         self.message = message
         super().__init__(message)
 
@@ -13,16 +15,11 @@ class CustomError(AppCommandError):
 class APIError(AppCommandError):
     """ A custom error that is raised when a command encountres an issue with API. """
 
-    def __init__(self, message: str):
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Something went wrong with API call."
         self.message = message
         super().__init__(message)
-
-
-class AuthError(ValueError):
-    """ A custom error that is raised when a command encountres an issue with API. """
-
-    def __init__(self):
-        self.message = "Invalid API Key!"
 
 
 class JoinLobbyError(ValueError):

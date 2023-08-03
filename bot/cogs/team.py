@@ -156,8 +156,8 @@ class TeamCog(commands.Cog, name="Team"):
             raise CustomError(f"You cannot leave right now. Your team **{user_team.name}** belongs to match **#{team_match.id}**")
         
         user_model = await db.get_user_by_discord_id(user.id, self.bot)
-        status_code = await api.remove_team_member(user_team.id, user_model.steam)
-        if status_code < 400 or status_code == 404:
+        removed = await api.remove_team_member(user_team.id, user_model.steam)
+        if removed:
             await db.delete_team_users(user_team.id, [user])
             try:
                 await user.remove_roles(user_team.role)
@@ -209,8 +209,8 @@ class TeamCog(commands.Cog, name="Team"):
         users_model = await db.get_users(users_to_kick)
         for usr in users_model:
             try:
-                status_code = await api.remove_team_member(team_model.id, usr.steam)
-                if status_code < 400 or status_code == 404:
+                removed = await api.remove_team_member(team_model.id, usr.steam)
+                if removed:
                     await db.delete_team_users(team_model.id, [usr.user])
                     kicked_users.append(usr.user)
                     await usr.user.remove_roles(team_model.role)
@@ -251,8 +251,12 @@ class TeamCog(commands.Cog, name="Team"):
             embed.description = "Timeout! You haven't decided in time."
         elif confirm.accepted:
             team_users = await db.get_team_users(user_team.id, guild)
-            status_code = await api.delete_team(user_team.id)
-            if status_code < 400 or status_code == 404:
+            deleted = await api.delete_team(user_team.id)
+            if not deleted:
+                is_team_found = await api.get_team(user_team.id)
+                if not is_team_found:
+                    deleted = True
+            if deleted:
                 await db.delete_team(user_team.id, guild)
                 try:
                     await user_team.role.delete()
