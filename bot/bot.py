@@ -53,6 +53,9 @@ class G5Bot(commands.AutoShardedBot):
             
         embed = Embed(description=description, color=0xE02B2B)
 
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+
         await interaction.edit_original_response(embed=embed, view=None)
 
     def log_exception(self, msg, error):
