@@ -22,7 +22,6 @@ class G5Bot(commands.AutoShardedBot):
             Config.prefix), help_command=None, intents=intents)
 
         self.description = ""
-        self.avatar_url = ""
         self.logger = logging.getLogger('Bot')
         self.tree.on_error = self.on_app_command_error
 

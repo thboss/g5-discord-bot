@@ -550,7 +550,7 @@ class MatchCog(commands.Cog, name="Match"):
         embed = Embed(title=title, description=description)
         embed.set_author(
             name=f"{'🔴' if match_stats.end_time else '🟢'} Match #{match_stats.id}")
-        embed.set_thumbnail(url=self.bot.avatar_url)
+        embed.set_thumbnail(url=self.bot.user.avatar.url)
         if not mapstats and not match_stats.end_time:
             embed.set_footer(
                 text="Server will close after 5 minutes if anyone doesn't join")
