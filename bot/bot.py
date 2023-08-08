@@ -6,7 +6,7 @@ import os
 import traceback
 
 from discord.ext import commands
-from discord import app_commands, Interaction, Embed, Guild
+from discord import app_commands, Interaction, Embed, Guild, TextChannel
 
 from .helpers.db import db
 from .helpers.api import api
@@ -24,6 +24,11 @@ class G5Bot(commands.AutoShardedBot):
         self.description = ""
         self.logger = logging.getLogger('Bot')
         self.tree.on_error = self.on_app_command_error
+
+    async def notify(self, *users, channel: TextChannel):
+        """"""
+        message = await channel.send(content=''.join(u.mention for u in users))
+        await message.delete()
 
     async def on_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
         """ Executed every time a slash command catches an error. """

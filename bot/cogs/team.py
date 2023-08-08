@@ -5,6 +5,7 @@ from discord import app_commands, Interaction, Embed, SelectOption, Role
 from discord.interactions import Interaction
 
 
+from bot.bot import G5Bot
 from bot.helpers.errors import CustomError
 from bot.helpers.db import db
 from bot.helpers.api import api
@@ -14,7 +15,7 @@ from bot.views import ConfirmView, DropDownView
 class TeamCog(commands.Cog, name="Team"):
     """"""
 
-    def __init__(self, bot):
+    def __init__(self, bot: G5Bot):
         self.bot = bot
 
 
@@ -58,9 +59,9 @@ class TeamCog(commands.Cog, name="Team"):
         await interaction.edit_original_response(embed=embed)
 
     @app_commands.command(name="join-team", description="Join a team")
-    @app_commands.describe(team_role="Mention team role")
+    @app_commands.describe(team="Mention a team")
     @app_commands.checks.cooldown(1, 180)
-    async def join_team(self, interaction: Interaction, team_role: Role):
+    async def join_team(self, interaction: Interaction, team: Role):
         """"""
         await interaction.response.defer()
         user = interaction.user
@@ -75,7 +76,7 @@ class TeamCog(commands.Cog, name="Team"):
         if user_team:
             raise CustomError(f"You already in team **{user_team.name}**")
 
-        team_model = await db.get_team_by_role(team_role, self.bot)
+        team_model = await db.get_team_by_role(team, self.bot)
         if not team_model:
             raise CustomError("Team not found!")
 
@@ -85,10 +86,9 @@ class TeamCog(commands.Cog, name="Team"):
 
         embed.description = f"User {user.mention} wants to join your team **{team_model.name}**"
         confirm_view = ConfirmView(team_model.captain)
-        mention_msg = await interaction.channel.send(content=team_model.captain.mention)
         await interaction.edit_original_response(embed=embed, view=confirm_view)
+        await self.bot.notify(team_model.captain, channel=interaction.channel)
         await confirm_view.wait()
-        await mention_msg.delete()
 
         if confirm_view.accepted is None:
             embed.description = "Timeout! The join request was not accepted."
