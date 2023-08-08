@@ -484,7 +484,8 @@ class LobbyCog(commands.Cog, name="Lobby"):
             value=queued_players_str
         )
         embed.set_author(name=f"Lobby #{lobby_model.id}")
-        embed.set_thumbnail(url=self.bot.user.avatar.url)
+        if self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
         return embed
 
     async def move_to_channel(self, channel: VoiceChannel, users: List[Member]):
