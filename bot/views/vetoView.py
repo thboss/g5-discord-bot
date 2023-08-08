@@ -84,7 +84,7 @@ class VetoView(View):
         description = f"Series: {self.series}\n\n" \
             f"**Captain 1:** {self.captains[0].mention}\n" \
             f"**Captain 2:** {self.captains[1].mention}\n\n" \
-            f"**Captain Turn:** {self._active_picker.mention}\n" \
+            f"**Current Turn:** {self._active_picker.mention}\n" \
             f"**Method:** {self._current_method}"
         embed = Embed(title=title, description=description)
         return embed

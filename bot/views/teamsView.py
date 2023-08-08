@@ -74,16 +74,11 @@ class PickTeamsView(View):
         await interaction.response.defer()
         captain = interaction.user
         selected_player = button.user
-        print('captain', captain)
-        print('selected player', selected_player)
 
         if selected_player is None or selected_player not in self.users_left or captain not in self.users:
             return
-        
-        print('here')
 
         if not self._pick_player(captain, selected_player):
-            print('not _pick_player')
             return
 
         self._remove_captain_button(captain)
@@ -91,13 +86,13 @@ class PickTeamsView(View):
         title = f"Team **{captain.display_name}** picked **{selected_player.display_name}**"
 
         if not self.users_left:
-            embed = self.create_teams_embed(title)
+            embed = self.embed_teams_pick(title)
             await self.message.edit(embed=embed, view=None)
             self.stop()
             return
 
         self.remove_item(button)
-        embed = self.create_teams_embed(title)
+        embed = self.embed_teams_pick(title)
         await self.message.edit(embed=embed, view=self)
 
     def _remove_captain_button(self, captain: Member):
@@ -106,34 +101,25 @@ class PickTeamsView(View):
         if captain_button:
             self.remove_item(captain_button)
 
-    def create_teams_embed(self, title: str):
+    def embed_teams_pick(self, title: str):
         embed = Embed(title=title)
-        self.add_team_fields(embed)
-        if self.users_left:
-            self.add_players_left_field(embed)
-            self.add_captains_info_field(embed)
-        return embed
+        str_info = ''
 
-    def add_team_fields(self, embed: Embed):
         for idx, team in enumerate(self.teams, start=1):
             team_name = f'__Team {idx}__'
             team_players = "*Empty*" if len(
                 team) == 0 else '\n'.join(u.mention for u in team)
             embed.add_field(name=team_name, value=team_players)
 
-    def add_players_left_field(self, embed: Embed):
-        users_left_str = '\n'.join(user.mention for user in self.users if not any(
-            user in team for team in self.teams))
-        embed.insert_field_at(1, name="Players Left", value=users_left_str)
+        if self.users_left:
+            str_info += f'Team1 captain: {self.teams[0][0].mention}\n' if len(
+                self.teams[0]) else 'Team1 captain:\n'
+            str_info += f'Team2 captain: {self.teams[1][0].mention}\n\n' if len(
+                self.teams[1]) else 'Team2 captain:\n\n'
+            str_info += f'Current turn: {self._active_picker.mention}' if self._active_picker is not None else 'Current turn: Any'
+            embed.add_field(name="Picker Info", value=str_info)
 
-    def add_captains_info_field(self, embed: Embed):
-        status_str = ''
-        status_str += f'Team1 captain: {self.teams[0][0].mention}\n' if len(
-            self.teams[0]) else 'Team1 captain:\n'
-        status_str += f'Team2 captain: {self.teams[1][0].mention}\n\n' if len(
-            self.teams[1]) else 'Team2 captain:\n\n'
-        status_str += f'Choice: {self._active_picker.mention}' if self._active_picker is not None else 'Choice:'
-        embed.add_field(name="Captains Info", value=status_str)
+        return embed
 
     async def start(self, captain_method: str):
         if captain_method == 'rank':
