@@ -92,8 +92,11 @@ class G5Bot(commands.AutoShardedBot):
 
         # Sync slash commands
         guild = self.get_guild(Config.guild_id)
-        await self.tree.sync(guild=guild)
-        self.tree.copy_global_to(guild=guild)
+        if guild:
+            await self.tree.sync(guild=guild)
+            self.tree.copy_global_to(guild=guild)
+        else:
+            self.logger.warning(f"No guild found for id {Config.guild_id}")
         # Sync commands globally if enabled
         if Config.sync_commands_globally:
             self.logger.info("Syncing commands globally...")
