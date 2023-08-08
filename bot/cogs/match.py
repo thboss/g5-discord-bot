@@ -604,6 +604,12 @@ class MatchCog(commands.Cog, name="Match"):
             await message.edit(embed=Embed(description='Setting up match on game server...'), view=None)
             await asyncio.sleep(2)
 
+            dict_spectators = {}
+            spectators = await db.get_spectators(guild)
+            for spec in spectators:
+                if spec.user not in team1_users and spec.user not in team2_users:
+                    dict_spectators[spec.steam] = spec.user.display_name
+
             match_id = await api.create_match(
                 match_server.id,
                 team1_id,
@@ -611,7 +617,8 @@ class MatchCog(commands.Cog, name="Match"):
                 str_maps,
                 len(team1_users + team2_users),
                 game_mode,
-                is_pug
+                is_pug,
+                dict_spectators
             )
 
             await message.edit(embed=Embed(description='Setting up teams channels...'), view=None)

@@ -50,6 +50,7 @@ class LinkCog(commands.Cog, name='Link'):
         """"""
         await interaction.response.defer(ephemeral=True)
         user = interaction.user
+
         user_model = await db.get_user_by_discord_id(user.id, self.bot)
         if not user_model:
             raise CustomError("Your account is not linked to Steam.")
@@ -68,6 +69,12 @@ class LinkCog(commands.Cog, name='Link'):
         if user_team:
             raise CustomError(
                 f"You can't unlink your account while you are in team #{user_team.id}")
+        
+        spectators = await db.get_spectators(interaction.guild)
+        for spec in spectators:
+            if spec.user == user:
+                raise CustomError(
+                    "You can't unlink your account while you are in spectators list.")
 
         try:
             await db.delete_user(user.id)

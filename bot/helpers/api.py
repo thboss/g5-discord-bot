@@ -475,7 +475,8 @@ class APIManager:
         str_maps: str,
         total_players: int,
         game_mode: Literal["competitive", "wingman"],
-        pug: bool=True
+        pug: bool=True,
+        spectators: dict={}
     ) -> int:
         """
         Sends an HTTP POST request to create a new match.
@@ -516,7 +517,8 @@ class APIManager:
             'match_cvars': {
                 'sv_hibernate_when_empty': 0,
                 'get5_time_to_start': 300,
-            }
+            },
+            'spectator_auths': spectators
         }
 
         try:

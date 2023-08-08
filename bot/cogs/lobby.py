@@ -328,6 +328,49 @@ class LobbyCog(commands.Cog, name="Lobby"):
         embed = Embed(description=description)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+    @app_commands.command(name="add-spectator", description="Add a user to the matches")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def add_spectator(self, interaction: Interaction, user: Member):
+        """"""
+        await interaction.response.defer()
+        user_model = await db.get_user_by_discord_id(user.id, self.bot)
+        if not user_model:
+            raise CustomError(f"User {user.mention} must be linked.")
+        
+        try:
+            await db.insert_spectators(user, guild=interaction.guild)
+        except UniqueViolationError:
+            raise CustomError(f"User {user.mention} is already in spectators list")
+
+        embed = Embed(description=f"User {user.mention} has successfully added to the spectators list")
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="remove-spectator", description="Remove a user from the spectators list")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def remove_spectator(self, interaction: Interaction, user: Member):
+        """"""
+        await interaction.response.defer()
+        deleted = await db.delete_spectators(user, guild=interaction.guild)
+        if not deleted:
+            raise CustomError(f"User {user.mention} is not in spectators list")
+        
+        embed = Embed(description=f"User {user.mention} has successfully removed from spectators list")
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="spectators-list", description="Show list of match spectators")
+    async def spectators_list(self, interaction: Interaction):
+        """"""
+        await interaction.response.defer()
+        spectators = await db.get_spectators(interaction.guild)
+        
+        if spectators:
+            description = "\n".join(f"{idx}. {spec.user.mention}" for idx, spec in enumerate(spectators))
+        else:
+            description = "No spectators found"
+
+        embed = Embed(description=description)
+        await interaction.followup.send(embed=embed)
+        
     @commands.Cog.listener()
     async def on_voice_state_update(self, user: Member, before: VoiceState, after: VoiceState):
         """"""

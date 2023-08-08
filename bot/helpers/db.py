@@ -492,6 +492,27 @@ class DBManager:
         data = await self.query(sql, team_id, guild.id)
         if data:
             return MatchModel.from_dict(data[0], guild)
-
-
+        
+    async def get_spectators(self, guild: discord.Guild) -> List[UserModel]:
+        """"""
+        sql = "SELECT * FROM users u\n" \
+              "JOIN spectators s\n" \
+              "    ON s.user_id = u.discord_id\n" \
+              "WHERE s.guild_id = $1;"
+        results = await self.query(sql, guild.id)
+        return [UserModel.from_dict(row, guild.get_member(row["discord_id"])) for row in results]
+    
+    async def insert_spectators(self, *users: List[discord.Member], guild: discord.Guild):
+        """"""
+        values = f", ".join(
+            f"({guild.id}, {user.id})" for user in users)
+        sql = f"INSERT INTO spectators VALUES {values};"
+        await self.query(sql)
+        
+    async def delete_spectators(self, *users: List[discord.Member], guild: discord.Guild):
+        """"""
+        sql = "DELETE FROM spectators\n" \
+             f"    WHERE user_id::BIGINT = ANY(ARRAY{[u.id for u in users]}::BIGINT[]) AND guild_id = $1\n" \
+              "RETURNING user_id;"
+        return await self.query(sql, guild.id)
 db = DBManager()
