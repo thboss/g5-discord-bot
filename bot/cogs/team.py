@@ -98,7 +98,7 @@ class TeamCog(commands.Cog, name="Team"):
                 'captain': False,
                 'coach': False,
             }}
-            added = await api.add_team_member(team_model.id, dict_user)
+            added, resp_msg = await api.add_team_member(team_model.id, dict_user)
             if added:
                 await db.insert_team_users(team_model.id, [user])
                 try:
@@ -106,7 +106,7 @@ class TeamCog(commands.Cog, name="Team"):
                 except: pass
                 embed.description = f"{user.mention} You have joined team **{team_model.name}**."
             else:
-                raise CustomError
+                raise CustomError(resp_msg)
         else:
             embed.description = "Join team request rejected. Maybe next time!"
 
@@ -132,7 +132,7 @@ class TeamCog(commands.Cog, name="Team"):
             raise CustomError(f"You cannot leave right now. Your team **{user_team.name}** belongs to match **#{team_match.id}**")
         
         user_model = await db.get_user_by_discord_id(user.id, self.bot)
-        removed = await api.remove_team_member(user_team.id, user_model.steam)
+        removed, resp_msg = await api.remove_team_member(user_team.id, user_model.steam)
         if removed:
             await db.delete_team_users(user_team.id, [user])
             try:
@@ -143,7 +143,7 @@ class TeamCog(commands.Cog, name="Team"):
                 await interaction.channel.send(content=user_team.captain.mention, embed=embed)
             embed.description = f"You have been removed from team **{user_team.name}**."
         else:
-            raise CustomError
+            raise CustomError(resp_msg)
 
         await interaction.edit_original_response(embed=embed, view=None)
 
@@ -180,23 +180,21 @@ class TeamCog(commands.Cog, name="Team"):
         
         users_to_kick = list(filter(lambda x: str(x.id) in dropdown.selected_options, team_users))
         kicked_users = []
+        resp_msg = None
         users_model = await db.get_users(users_to_kick)
         for usr in users_model:
-            try:
-                removed = await api.remove_team_member(team_model.id, usr.steam)
-                if removed:
-                    await db.delete_team_users(team_model.id, [usr.user])
-                    kicked_users.append(usr.user)
-                    await usr.user.remove_roles(team_model.role)
-            except Exception as e:
-                self.bot.log_exception("Error: ", e)
+            removed, resp_msg = await api.remove_team_member(team_model.id, usr.steam)
+            if removed:
+                await db.delete_team_users(team_model.id, [usr.user])
+                kicked_users.append(usr.user)
+                await usr.user.remove_roles(team_model.role)
 
         mention_users = ', '.join(u.mention for u in kicked_users)
         if kicked_users:
             await interaction.channel.send(mention_users)
             embed.description = f"Players {mention_users} have been kicked from team **{team_model.name}**"
         else:
-            raise CustomError
+            raise CustomError(resp_msg)
 
         await interaction.edit_original_response(embed=embed, view=None)
 
@@ -224,7 +222,7 @@ class TeamCog(commands.Cog, name="Team"):
         if confirm.accepted is None:
             embed.description = "Timeout! You haven't decided in time."
         elif confirm.accepted:
-            deleted = await api.delete_team(user_team.id)
+            deleted, resp_msg = await api.delete_team(user_team.id)
             if not deleted:
                 is_team_found = await api.get_team(user_team.id)
                 if not is_team_found:
@@ -240,7 +238,7 @@ class TeamCog(commands.Cog, name="Team"):
                     teammate_mentions = ''.join(u.mention for u in team_users)
                     await interaction.channel.send(teammate_mentions)
             else:
-                raise CustomError
+                raise CustomError(resp_msg)
         else:
             embed.description = "Delete team cancelled."
         

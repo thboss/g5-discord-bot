@@ -252,7 +252,10 @@ class MatchCog(commands.Cog, name="Match"):
     async def cancel_match(self, interaction: Interaction, match_id: int):
         """"""
         await interaction.response.defer()
-        await api.cancel_match(match_id)
+        success, resp_msg = await api.cancel_match(match_id)
+        if not success:
+            raise APIError(resp_msg)
+
         embed = Embed(description=f"Match #{match_id} canceled successfully.")
         await interaction.followup.send(embed=embed)
 
@@ -276,7 +279,10 @@ class MatchCog(commands.Cog, name="Match"):
     async def restart_match(self, interaction: Interaction, match_id: int):
         """"""
         await interaction.response.defer()
-        await api.restart_match(match_id)
+        success, resp_msg = await api.restart_match(match_id)
+        if not success:
+            raise APIError(resp_msg)
+
         embed = Embed(description=f"Match #{match_id} restarted successfully.")
         await interaction.followup.send(embed=embed)
 
@@ -286,7 +292,10 @@ class MatchCog(commands.Cog, name="Match"):
     async def pause_match(self, interaction: Interaction, match_id: int):
         """"""
         await interaction.response.defer()
-        await api.pause_match(match_id)
+        success, resp_msg = await api.pause_match(match_id)
+        if not success:
+            raise APIError(resp_msg)
+
         embed = Embed(description=f"Match #{match_id} paused successfully.")
         await interaction.followup.send(embed=embed)
 
@@ -296,7 +305,10 @@ class MatchCog(commands.Cog, name="Match"):
     async def unpause_match(self, interaction: Interaction, match_id: int):
         """"""
         await interaction.response.defer()
-        await api.unpause_match(match_id)
+        success, resp_msg = await api.unpause_match(match_id)
+        if not success:
+            raise APIError(resp_msg)
+
         embed = Embed(description=f"Match #{match_id} unpaused successfully.")
         await interaction.followup.send(embed=embed)
 
@@ -334,7 +346,10 @@ class MatchCog(commands.Cog, name="Match"):
         else:
             team_name = "spectator"
 
-        await api.add_match_player(match_id, user_model.steam, user.display_name, team)
+        success, resp_msg = await api.add_match_player(match_id, user_model.steam, user.display_name, team)
+        if not success:
+            raise APIError(resp_msg)
+
         await db.insert_match_users(match_id, [user])
 
         try:
@@ -385,7 +400,10 @@ class MatchCog(commands.Cog, name="Match"):
             raise CustomError(
                 f"User {user.mention} not in match #{match_id}")
 
-        await api.remove_match_player(match_id, user_model.steam)
+        success, resp_msg = await api.remove_match_player(match_id, user_model.steam)
+        if not success:
+            raise APIError(resp_msg)
+
         await db.delete_match_user(match_id, user)
 
         try:

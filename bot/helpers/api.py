@@ -249,10 +249,10 @@ class APIManager:
             async with self.session.delete(url=url, json=[data]) as resp:
                 if "/auth/steam" in str(resp.url):
                     raise ValueError("Invalid API key")
-                await resp.json()
+                resp_data = await resp.json()
                 if not resp.ok:
-                    return False
-                return True
+                    return False, resp_data["message"]
+                return True, resp_data["message"]
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
@@ -269,10 +269,10 @@ class APIManager:
             async with self.session.put(url=url, json=[data]) as resp:
                 if "/auth/steam" in str(resp.url):
                     raise ValueError("Invalid API key")
-                await resp.json()
+                resp_data = await resp.json()
                 if not resp.ok:
-                    return False
-                return True
+                    return False, resp_data["message"]
+                return True, resp_data["message"]
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
@@ -289,10 +289,10 @@ class APIManager:
             async with self.session.delete(url=url, json=[data]) as resp:
                 if "/auth/steam" in str(resp.url):
                     raise ValueError("Invalid API key")
-                await resp.json()
+                resp_data = await resp.json()
                 if not resp.ok:
-                    return False
-                return True
+                    return False, resp_data["message"]
+                return True, resp_data["message"]
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
@@ -336,10 +336,10 @@ class APIManager:
             async with self.session.get(url=url) as resp:
                 if "/auth/steam" in str(resp.url):
                     raise ValueError("Invalid API key")
-                await resp.json()
+                resp_data = await resp.json()
                 if not resp.ok:
-                    return False
-                return True
+                    return False, resp_data["message"]
+                return True, resp_data["message"]
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
@@ -572,10 +572,10 @@ class APIManager:
             async with self.session.get(url=url) as resp:
                 if "/auth/steam" in str(resp.url):
                     raise ValueError("Invalid API key")
-                await resp.json()
+                resp_data = await resp.json()
                 if not resp.ok:
-                    return False
-                return True
+                    return False, resp_data["message"]
+                return True, resp_data["message"]
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
@@ -617,10 +617,10 @@ class APIManager:
             async with self.session.get(url=url) as resp:
                 if "/auth/steam" in str(resp.url):
                     raise ValueError("Invalid API key")
-                await resp.json()
+                resp_data = await resp.json()
                 if not resp.ok:
-                    return False
-                return True
+                    return False, resp_data["message"]
+                return True, resp_data["message"]
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
@@ -645,10 +645,10 @@ class APIManager:
             async with self.session.get(url=url) as resp:
                 if "/auth/steam" in str(resp.url):
                     raise ValueError("Invalid API key")
-                await resp.json()
+                resp_data = await resp.json()
                 if not resp.ok:
-                    return False
-                return True
+                    return False, resp_data["message"]
+                return True, resp_data["message"]
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
@@ -673,10 +673,10 @@ class APIManager:
             async with self.session.get(url=url) as resp:
                 if "/auth/steam" in str(resp.url):
                     raise ValueError("Invalid API key")
-                await resp.json()
+                resp_data = await resp.json()
                 if not resp.ok:
-                    return False
-                return True
+                    return False, resp_data["message"]
+                return True, resp_data["message"]
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
@@ -717,10 +717,10 @@ class APIManager:
             async with self.session.put(url=url, json=[data]) as resp:
                 if "/auth/steam" in str(resp.url):
                     raise ValueError("Invalid API key")
-                await resp.json()
+                resp_data = await resp.json()
                 if not resp.ok:
-                    return False
-                return True
+                    return False, resp_data["message"]
+                return True, resp_data["message"]
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
@@ -747,10 +747,10 @@ class APIManager:
             async with self.session.put(url=url, json=[data]) as resp:
                 if "/auth/steam" in str(resp.url):
                     raise ValueError("Invalid API key")
-                await resp.json()
+                resp_data = await resp.json()
                 if not resp.ok:
-                    return False
-                return True
+                    return False, resp_data["message"]
+                return True, resp_data["message"]
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
