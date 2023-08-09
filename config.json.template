@@ -3,7 +3,8 @@
     "prefix": "!",
     "token": "",
     "guild_id": 1234567890,
-    "sync_commands_globally": true
+    "sync_commands_globally": true,
+    "debug": false
   },
   "web": {
     "base_url": "",
