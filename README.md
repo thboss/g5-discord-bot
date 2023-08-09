@@ -39,5 +39,5 @@ A Discord bot to manage CS:GO PUGs and teams matches. Connects to [G5API](https:
 
 ## Thanks To
 
-[Cameron Shinn](https://github.com/cameronshinn) for his initial implementation of [csgo-league-bot](https://github.com/csgo-league/csgo-league-bot).
-[PhlexPlexico](https://github.com/PhlexPlexico/) for his implementation of [G5API](https://github.com/PhlexPlexico/G5API)
+1. [Cameron Shinn](https://github.com/cameronshinn) for his initial implementation of [csgo-league-bot](https://github.com/csgo-league/csgo-league-bot).
+2. [PhlexPlexico](https://github.com/PhlexPlexico/) for his implementation of [G5API](https://github.com/PhlexPlexico/G5API)
