@@ -579,6 +579,23 @@ class APIManager:
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
+        
+    async def forfeit_match(self, match_id: int, winner: Literal[1, 2]):
+        """"""
+
+        url = f"/api/matches/{match_id}/forfeit/{winner}"
+
+        try:
+            async with self.session.get(url=url) as resp:
+                if "/auth/steam" in str(resp.url):
+                    raise ValueError("Invalid API key")
+                resp_data = await resp.json()
+                if not resp.ok:
+                    return False, resp_data["message"]
+                return True, resp_data["message"]
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
 
     async def restart_match(self, match_id: int):
         """

@@ -256,6 +256,20 @@ class MatchCog(commands.Cog, name="Match"):
         embed = Embed(description=f"Match #{match_id} canceled successfully.")
         await interaction.followup.send(embed=embed)
 
+    @app_commands.command(name="forfeit-match", description="Forfeit a live match")
+    @app_commands.describe(match_id="Match ID", winner="Choose either Team1 or Team2 to be the winner.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def forfeit_match(self, interaction: Interaction, match_id: int, winner: Literal["team1", "team2"]):
+        """"""
+        await interaction.response.defer()
+        success, resp_msg = await api.forfeit_match(match_id, winner[4])
+        if not success:
+            raise APIError(resp_msg)
+
+        description=f"Match #{match_id} has been forfeitted successfully."
+        embed = Embed(description=description)
+        await interaction.followup.send(embed=embed)
+
     @app_commands.command(name="restart-match", description="Restart a live match")
     @app_commands.describe(match_id="Match ID")
     @app_commands.checks.has_permissions(administrator=True)
