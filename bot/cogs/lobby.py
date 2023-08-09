@@ -8,6 +8,7 @@ from discord.ext import commands
 from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPException, VoiceChannel, SelectOption
 
 from bot.helpers.db import db
+from bot.helpers.api import api
 from bot.helpers.models import LobbyModel
 from bot.helpers.errors import CustomError, JoinLobbyError
 from bot.views import ReadyView, DropDownView
@@ -99,12 +100,18 @@ class LobbyCog(commands.Cog, name="Lobby"):
         series: app_commands.Choice[str],
         game_mode: app_commands.Choice[str],
         auto_ready: app_commands.Choice[int],
+        season_id: Optional[int],
         region: Optional[str],
     ):
         """ Create a new lobby. """
         await interaction.response.defer(ephemeral=True)
         if region and region.upper() not in COUNTRY_FLAGS:
             raise CustomError("Invalid region code")
+        
+        if season_id:
+            season = await api.get_season(season_id)
+            if not season:
+                raise CustomError("Invalid season ID")
 
         guild = interaction.guild
         guild_model = await db.get_guild_by_id(guild.id, self.bot)
@@ -132,10 +139,12 @@ class LobbyCog(commands.Cog, name="Lobby"):
             'game_mode': game_mode.value,
             'category': category.id,
             'queue_channel': text_channel.id,
-            'lobby_channel': voice_channel.id,
+            'lobby_channel': voice_channel.id
         }
         if region:
             lobby_data['region'] = region.upper()
+        if season_id:
+            lobby_data['season_id'] = season_id
 
         lobby_id = await db.insert_lobby(lobby_data)
 
@@ -463,7 +472,8 @@ class LobbyCog(commands.Cog, name="Lobby"):
                         captain_method=lobby_model.captain_method,
                         map_method=lobby_model.map_method,
                         series=lobby_model.series,
-                        region=lobby_model.region
+                        region=lobby_model.region,
+                        season_id=lobby_model.season_id
                     )
                     if not match_started:
                         await self.move_to_channel(guild_model.prematch_channel, queued_users)

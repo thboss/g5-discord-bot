@@ -22,7 +22,8 @@ class LobbyModel:
         series: Literal["bo1", "bo2", "bo3"],
         game_mode: Literal["competitive", "wingman"],
         auto_ready: bool,
-        region: str
+        season_id: Optional[int],
+        region: Optional[str]
     ):
         """"""
         self.id = lobby_id
@@ -38,6 +39,7 @@ class LobbyModel:
         self.series = series
         self.game_mode = game_mode
         self.auto_ready = auto_ready
+        self.season_id =  season_id
         self.region = region
 
     @classmethod
@@ -57,5 +59,6 @@ class LobbyModel:
             data['series_type'],
             data['game_mode'],
             data['autoready'],
+            data['season_id'],
             data['region']
         )

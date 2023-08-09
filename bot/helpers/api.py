@@ -139,6 +139,23 @@ class Team:
     @classmethod
     def from_dict(cls, data: dict) -> "Team":
         return cls(data)
+    
+
+class Season:
+    """"""
+
+    def __init__(self, season_data: dict, matches: List[Match]) -> None:
+        """"""
+        self.id = season_data['id']
+        self.name = season_data['name']
+        self.start_date = season_data['start_date']
+        self.end_date = season_data['end_date']
+        self.matches = matches
+
+    @classmethod
+    def from_dict(cls, season_data: dict, matches_data: list) -> "Season":
+        matches = [Match.from_dict(m) for m in matches_data]
+        return cls(season_data, matches)
 
 
 async def start_request_log(session, ctx, params):
@@ -476,7 +493,8 @@ class APIManager:
         total_players: int,
         game_mode: Literal["competitive", "wingman"],
         pug: bool=True,
-        spectators: dict={}
+        spectators: dict={},
+        season_id: int=None
     ) -> int:
         """
         Sends an HTTP POST request to create a new match.
@@ -499,10 +517,11 @@ class APIManager:
         url = "/api/matches"
 
         data = {
+            'season_id': season_id,
             'server_id': server_id,
             'team1_id': team1_id,
             'team2_id': team2_id,
-            'title': '[PUG] Map {MAPNUMBER} of {MAXMAPS}',
+            'title': 'Map {MAPNUMBER} of {MAXMAPS}',
             'wingman': game_mode == 'wingman',
             'is_pug': pug,
             'start_time': datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
@@ -718,5 +737,20 @@ class APIManager:
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
+        
+    async def get_season(self, season_id: int):
+        """"""
+        url = f"/api/seasons/{season_id}"
+
+        try:
+            async with self.session.get(url=url) as resp:
+                resp_data = await resp.json()
+                if not resp.ok:
+                    return
+                return Season.from_dict(resp_data["season"], resp_data["matches"])
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
+                
 
 api = APIManager()

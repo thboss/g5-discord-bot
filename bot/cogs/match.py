@@ -2,13 +2,13 @@
 
 from discord.ext import commands, tasks
 from discord import Embed, NotFound, app_commands, Member, Message, Interaction, Guild, SelectOption, Role
-from typing import Literal, List
+from typing import Literal, List, Optional
 
 from random import sample, shuffle
 from datetime import datetime
 import asyncio
 
-from bot.helpers.api import api, Match, MapStat, Server
+from bot.helpers.api import api, Match, MapStat, Server, Season
 from bot.helpers.db import db
 from bot.helpers.models import GuildModel, TeamModel, MatchModel, MapModel
 from bot.bot import G5Bot
@@ -70,7 +70,8 @@ class MatchCog(commands.Cog, name="Match"):
         series: Literal["bo1", "bo2", "bo3"],
         game_mode: Literal["competitive", "wingman"],
         author: Member,
-        guild_maps: List[MapModel]
+        guild_maps: List[MapModel],
+        season_id: int=None
     ):
         """"""
         embed = Embed()
@@ -108,7 +109,8 @@ class MatchCog(commands.Cog, name="Match"):
             game_mode=game_mode,
             series=series,
             team1_model=team1_model,
-            team2_model=team2_model
+            team2_model=team2_model,
+            season_id=season_id
         )
 
         if match_started:
@@ -139,7 +141,8 @@ class MatchCog(commands.Cog, name="Match"):
         team2: Role,
         capacity: app_commands.Choice[int],
         series: app_commands.Choice[str],
-        game_mode: app_commands.Choice[str]
+        game_mode: app_commands.Choice[str],
+        season_id: Optional[int]
     ):
         """"""
         await interaction.response.defer()
@@ -154,6 +157,11 @@ class MatchCog(commands.Cog, name="Match"):
         team2_model = await db.get_team_by_role(team2, self.bot)
         if not team2_model:
             raise CustomError(f"Team {team2.mention} not found")
+        
+        if season_id:
+            season = await api.get_season(season_id)
+            if not season:
+                raise CustomError(f"Season #{season_id} not found.")
 
         guild_maps = await db.get_guild_maps(guild, game_mode.value)
         if len(guild_maps) < 7:
@@ -167,7 +175,8 @@ class MatchCog(commands.Cog, name="Match"):
             series.value,
             game_mode.value,
             user,
-            guild_maps
+            guild_maps,
+            season_id
         )
 
     @app_commands.command(name="challenge", description="Start a new match vs a team from your choice")
@@ -496,7 +505,13 @@ class MatchCog(commands.Cog, name="Match"):
         team2_users = temp_users[team_size:]
         return team1_users, team2_users
 
-    def embed_match_info(self, match_stats: Match, game_server: Server = None, mapstats: List[MapStat] = []):
+    def embed_match_info(
+        self,
+        match_stats: Match,
+        game_server: Server=None,
+        mapstats: List[MapStat]=[],
+        season: Season=None
+    ):
         """"""
         title = f"**{match_stats.team1_string}**  [{match_stats.team1_score}:{match_stats.team2_score}]  **{match_stats.team2_string}**"
         description = ''
@@ -523,10 +538,19 @@ class MatchCog(commands.Cog, name="Match"):
         description += f"[Match Info]({Config.base_url}/match/{match_stats.id})"
 
         embed = Embed(title=title, description=description)
-        embed.set_author(
-            name=f"{'🔴' if match_stats.end_time else '🟢'} Match #{match_stats.id}")
+
+        author_name = f"{'🔴' if match_stats.end_time else '🟢'} Match #{match_stats.id}"
+        if match_stats.is_pug:
+            author_name += " [PUG]"
+        else:
+            author_name += " [Official]"
+        if season:
+            author_name += f" [Season: {season.name}]"
+        embed.set_author(name=author_name)
+
         if self.bot.user.avatar:
             embed.set_thumbnail(url=self.bot.user.avatar.url)
+
         if not mapstats and not match_stats.end_time:
             embed.set_footer(
                 text="Server will close after 5 minutes if anyone doesn't join")
@@ -545,7 +569,8 @@ class MatchCog(commands.Cog, name="Match"):
         series: str='bo1',
         region: str='',
         team1_model: TeamModel=None,
-        team2_model: TeamModel=None
+        team2_model: TeamModel=None,
+        season_id: int=None,
     ):
         """"""
         is_pug = len(queue_users) > 0
@@ -618,7 +643,8 @@ class MatchCog(commands.Cog, name="Match"):
                 len(team1_users + team2_users),
                 game_mode,
                 is_pug,
-                dict_spectators
+                dict_spectators,
+                season_id
             )
 
             await message.edit(embed=Embed(description='Setting up teams channels...'), view=None)
@@ -780,6 +806,7 @@ class MatchCog(commands.Cog, name="Match"):
         mapstats = []
         game_server = None
         message = None
+        season = None
         guild_model = await db.get_guild_by_id(match_model.guild.id, self.bot)
 
         if not match_model.text_channel:
@@ -810,8 +837,10 @@ class MatchCog(commands.Cog, name="Match"):
         except Exception as e:
             pass
 
+        season = await api.get_season(match_stats.season_id)
+
         if message:
-            embed = self.embed_match_info(match_stats, game_server, mapstats)
+            embed = self.embed_match_info(match_stats, game_server, mapstats, season)
             await message.edit(embed=embed)
 
         if not match_stats.end_time and not match_stats.cancelled and not match_stats.forfeit:
@@ -824,7 +853,7 @@ class MatchCog(commands.Cog, name="Match"):
 
         if mapstats and not match_stats.cancelled:
             try:
-                embed = self.embed_match_info(match_stats, mapstats=mapstats)
+                embed = self.embed_match_info(match_stats, mapstats=mapstats, season=season)
                 await guild_model.results_channel.send(embed=embed)
             except Exception as e:
                 pass
