@@ -1,0 +1,19 @@
+{
+  "bot": {
+    "prefix": "!",
+    "token": "",
+    "guild_id": 1234567890,
+    "sync_commands_globally": true
+  },
+  "web": {
+    "base_url": "",
+    "api_key": ""
+  },
+  "db": {
+    "user": "g5",
+    "password": "yourpassword",
+    "database": "g5",
+    "host": "localhost",
+    "port": "5432"
+  }
+}

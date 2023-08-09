@@ -1,0 +1,22 @@
+{
+  "bans": true,
+  "dm_messages": true,
+  "dm_reactions": true,
+  "dm_typing": true,
+  "emojis": true,
+  "guild_messages": true,
+  "guild_reactions": true,
+  "guild_scheduled_events": true,
+  "guild_typing": true,
+  "guilds": true,
+  "integrations": true,
+  "invites": true,
+  "members": true,
+  "messages": true,
+  "message_content": true,
+  "presences": true,
+  "reactions": true,
+  "typing": true,
+  "voice_states": true,
+  "webhooks": true
+}

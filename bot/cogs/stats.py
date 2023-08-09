@@ -1,80 +1,101 @@
 # stats.py
 
-from discord.ext import commands, tasks
+from discord.ext import commands
+from discord import app_commands, Embed, Interaction, Member
+from typing import Optional, List
 
-from ..utils import Utils, API, DB
-from ..resources import G5
+from bot.helpers.api import api, PlayerStat
+from bot.helpers.errors import CustomError
+from bot.helpers.utils import align_text
 
 
-class StatsCog(commands.Cog):
-    """"""
+class StatsCog(commands.Cog, name="Stats"):
+    def __init__(self, bot):
+        self.bot = bot
 
-    @commands.command(brief=Utils.trans('command-stats-brief'),
-                      aliases=['rank'])
-    @DB.Guild.is_guild_setup()
-    async def stats(self, ctx):
+    def playerstat_template(self, playerstat: PlayerStat) -> Embed:
         """"""
-        db_user = await DB.User.get_user_by_id(ctx.author.id, ctx.guild)
-        db_guild = await DB.Guild.get_guild_by_id(ctx.guild.id)
-        if not db_user or not db_user.steam:
-            raise commands.CommandInvokeError(Utils.trans(
-                'stats-not-linked', ctx.author.display_name))
+        embed = Embed()
+        embed.add_field(name='Rating', value=str(
+            playerstat.rating), inline=False)
+        embed.add_field(name='', value='', inline=False)
+        embed.add_field(name='', value='', inline=False)
+        embed.add_field(name='Kills', value=str(playerstat.kills))
+        embed.add_field(name='Assists', value=str(playerstat.assists))
+        embed.add_field(name='Deaths', value=str(playerstat.deaths))
+        embed.add_field(name='', value='', inline=False)
+        embed.add_field(name='', value='', inline=False)
+        embed.add_field(name='K/D Ratio', value=str(playerstat.kdr))
+        embed.add_field(name='Headshots', value=str(playerstat.headshots))
+        embed.add_field(name='HS Percent', value=str(playerstat.hsp))
+        embed.add_field(name='', value='', inline=False)
+        embed.add_field(name='', value='', inline=False)
+        embed.add_field(name='3 K/R', value=str(playerstat.k3))
+        embed.add_field(name='4 K/R', value=str(playerstat.k4))
+        embed.add_field(name='5 K/R', value=str(playerstat.k5))
+        embed.add_field(name='', value='', inline=False)
+        embed.add_field(name='', value='', inline=False)
+        embed.add_field(name='Wins', value=str(playerstat.wins))
+        embed.add_field(name='Played', value=str(playerstat.played))
+        embed.add_field(name='Win Percent', value=str(playerstat.win_percent))
+        return embed
 
-        try:
-            seasons = await API.Seasons.my_seasons(db_guild.headers)
-            for season in seasons:
-                await self._playerstats(ctx, db_user, pug=False, season_id=season.id)
-                await self._playerstats(ctx, db_user, pug=True, season_id=season.id)
-        except Exception as e:
-            G5.bot.logger.info(str(e))
-
-        await self._playerstats(ctx, db_user, pug=True)
-        await self._playerstats(ctx, db_user, pug=False)
-
-    @ tasks.loop(seconds=300.0)
-    async def update_leaderboard(self):
+    @app_commands.command(name="stats", description="Show your stats")
+    @app_commands.describe(target="Target user to show their stats")
+    async def stats(self, interaction: Interaction, target: Optional[Member]):
         """"""
-        for guild in G5.bot.guilds:
-            db_guild = await DB.Guild.get_guild_by_id(guild.id)
-            users = await DB.User.get_users(guild.members, guild)
-            if not users:
-                continue
+        await interaction.response.defer()
+        user = target or interaction.user
+        playerstat = await api.get_playerstat(user, self.bot)
+        if not playerstat:
+            raise CustomError(
+                f"No stats were recorded for user {user.mention}")
 
-            leaders_channel = db_guild.leaders_channel
-            if not leaders_channel:
-                continue
+        embed = self.playerstat_template(playerstat)
+        embed.set_author(name=user.display_name, icon_url=user.avatar)
+        await interaction.followup.send(embed=embed)
 
-            try:
-                await leaders_channel.purge()
-            except Exception:
-                pass
-
-            try:
-                seasons = await API.Seasons.my_seasons(db_guild.headers)
-                for season in seasons:
-                    await self._leaderboard(leaders_channel, users, pug=True, season_id=season.id)
-            except Exception as e:
-                G5.bot.logger.info(str(e))
-
-            await self._leaderboard(leaders_channel, users, pug=True)
-            await self._leaderboard(leaders_channel, users, pug=False)
-
-    async def _playerstats(self, ctx, db_user, pug=False, season_id=None):
+    @app_commands.command(name="leaderboard", description="Show top player stats")
+    async def leaderboard(self, interaction: Interaction):
         """"""
-        try:
-            stats = await API.PlayerStats.get_player_stats(db_user, pug=pug, season_id=season_id)
-            file = Utils.generate_statistics_img(stats)
-            await ctx.send(file=file)
-        except Exception as e:
-            G5.bot.logger.info(str(e))
+        await interaction.response.defer()
+        leaderboard = await api.get_leaderboard(interaction.guild.members)
+        leaderboard.sort(key=lambda u: (u.rating), reverse=True)
+        leaderboard = leaderboard[:10]
 
-    async def _leaderboard(self, channel, users, pug=False, season_id=None):
-        """"""
-        try:
-            players = await API.PlayerStats.get_leaderboard(users, pug=pug, season_id=season_id)
-            players.sort(key=lambda u: u.rating, reverse=True)
-            if players:
-                file = Utils.generate_leaderboard_img(players[:10])
-                await channel.send(file=file)
-        except Exception as e:
-            G5.bot.logger.info(str(e))
+        # Generate leaderboard text
+        data = [['Player'] + [player.name for player in leaderboard],
+                ['Kills'] + [str(player.kills) for player in leaderboard],
+                ['Deaths'] + [str(player.deaths) for player in leaderboard],
+                ['Assists'] + [str(player.assists)
+                               for player in leaderboard],
+                ['Played'] + [str(player.played)
+                              for player in leaderboard],
+                ['Wins'] + [str(player.wins) for player in leaderboard],
+                ['Rating'] + [str(player.rating) for player in leaderboard]]
+        data[0] = [name if len(name) < 11 else name[:8] +
+                   '...' for name in data[0]]  # Shorten long names
+        widths = list(map(lambda x: len(max(x, key=len)), data))
+        aligns = ['left', 'center', 'center',
+                  'center', 'center', 'center', 'center']
+        z = zip(data, widths, aligns)
+        formatted_data = [list(map(lambda x: align_text(
+            x, width, align), col)) for col, width, align in z]
+        # Transpose list for .format() string
+        formatted_data = list(map(list, zip(*formatted_data)))
+
+        description = '```ml\n    {}  {}  {}  {}  {}  {}  {} \n'.format(
+            *formatted_data[0])
+
+        for rank, player_row in enumerate(formatted_data[1:], start=1):
+            description += ' {}. {}  {}  {}  {}  {}  {}  {} \n'.format(
+                rank, *player_row)
+
+        description += '```'
+
+        embed = Embed(title='Leaderboard', description=description)
+        await interaction.followup.send(embed=embed)
+
+
+async def setup(bot):
+    await bot.add_cog(StatsCog(bot))

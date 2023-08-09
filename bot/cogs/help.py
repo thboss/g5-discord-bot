@@ -1,42 +1,36 @@
-# help.py
-
+import discord
 from discord.ext import commands
 
-from ..utils import Utils
-from ..resources import G5
-
-AUTHOR = 'TheBO$$#2967'
-AUTHOR_ICON_URL = 'https://images.discordapp.net/avatars/389758324691959819/8888d88c6a8ca46de247882c8c0dcff2.png?size=64'
+from bot.bot import G5Bot
 
 
-class HelpCog(commands.Cog):
-    """ Handles everything related to the help menu. """
+class Help(commands.Cog):
 
-    def __init__(self):
-        """ Set attributes and remove default help command. """
-        G5.bot.remove_command('help')
+    def __init__(self, bot: G5Bot):
+        self.bot = bot
 
-    @commands.command(brief=Utils.trans('help-brief'))
-    async def help(self, ctx):
-        """ Generate and send help embed based on the bot's commands. """
-        description = "__**Basic Info:**__\n" \
-                      "_**G5** is a Discord bot to manage CS:GO matches on your own CS:GO servers_\n\n" \
-                      "__**Commands List:**__"
-        embed = G5.bot.embed_template(description=description)
-        prefix = G5.bot.command_prefix
-        prefix = prefix[0] if prefix is not str else prefix
+    @discord.app_commands.command(name='help', description='List of bot commands')
+    @commands.cooldown(1, 2, commands.BucketType.user)
+    async def help(self, interaction: discord.Interaction):
+        """"""
+        await interaction.response.defer(ephemeral=True)
+        embeds = []
+        all_commands = await self.bot.tree.fetch_commands()
 
-        for cog in G5.bot.cogs:  # Uset bot.cogs instead of bot.commands to control ordering in the help embed
-            for cmd in G5.bot.get_cog(cog).get_commands():
-                if cmd.usage:  # Command has usage attribute set
-                    embed.add_field(
-                        name=f'**{prefix}{cmd.usage}**', value=f'_{cmd.brief}_', inline=False)
-                else:
-                    embed.add_field(
-                        name=f'**{prefix}{cmd.name}**', value=f'_{cmd.brief}_', inline=False)
-        embed.set_thumbnail(url=G5.bot.user.avatar_url_as(size=128))
-        embed.set_footer(
-            text=f'Kindly developed by {AUTHOR}',
-            icon_url=AUTHOR_ICON_URL
-        )
-        await ctx.message.reply(embed=embed)
+        for cog_name, cog in self.bot.cogs.items():
+            if cog_name in ['Help', 'Logger']:
+                continue
+            embed = discord.Embed(title=cog_name + ' Commands', color=0x02b022)
+            cog_commands = cog.get_app_commands()
+            for cmd in cog_commands:
+                for c in all_commands:
+                    if c.name == cmd.name:
+                        embed.add_field(name=c.mention,
+                                        value=c.description, inline=False)
+            embeds.append(embed)
+
+        await interaction.followup.send(embeds=embeds, ephemeral=True)
+
+
+async def setup(bot):
+    await bot.add_cog(Help(bot))

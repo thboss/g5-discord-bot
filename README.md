@@ -1,6 +1,6 @@
 # G5 Bot
 
-A Discord bot to manage CS:GO PUGs. Connects to [G5API](https://github.com/PhlexPlexico/G5API).
+A Discord bot to manage CS:GO PUGs and teams matches. Connects to [G5API](https://github.com/PhlexPlexico/G5API).
 
 ## Setup
 
@@ -31,27 +31,13 @@ A Discord bot to manage CS:GO PUGs. Connects to [G5API](https://github.com/Phlex
 
    Quit psql with `\q`
 
-6. Create an environment file named `.env` with in the repository's root directory. Fill this template with the requisite information you've gathered...
-
-   ```py
-   DISCORD_BOT_TOKEN= # Bot token from the Discord developer portal
-   DISCORD_BOT_LANGUAGE=en # Bot language (key from translations.json)
-   DISCORD_BOT_PREFIXES=q! Q! # Bot commands prefixes
-
-   G5API_URL= # Make sure this is API url, not the front-end
-   G5V_URL= # Front-end url
-
-   POSTGRESQL_USER=g5 # PostgreSQL user name
-   POSTGRESQL_PASSWORD= # PostgreSQL password
-   POSTGRESQL_DB=g5 # PostgreSQL Database
-   POSTGRESQL_HOST=localhost # PostgreSQL host
-   POSTGRESQL_PORT=5432
-   ```
+6. Modify `config.json`.
 
 7. Apply the database migrations by running `python3 migrate.py up`.
 
-8. Run the launcher Python script by running, `python3 launcher.py`.
+8. Run the launcher Python script by running, `python3 run.py`.
 
 ## Thanks To
 
-[Cameron Shinn](https://github.com/cameronshinn) for his initial implementation of csgo-league-bot.
+[Cameron Shinn](https://github.com/cameronshinn) for his initial implementation of [csgo-league-bot](https://github.com/csgo-league/csgo-league-bot).
+[PhlexPlexico](https://github.com/PhlexPlexico/) for his implementation of [G5API](https://github.com/PhlexPlexico/G5API)

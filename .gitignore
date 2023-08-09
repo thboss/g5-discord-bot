@@ -1,5 +1,4 @@
 
-.env
-bot.log
 *.pyc
-*.log
+bot.log
+config.json

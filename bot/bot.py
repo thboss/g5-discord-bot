@@ -1,187 +1,167 @@
 # bot.py
 
-import discord
-from discord.ext import commands
 
-from aiohttp import ClientSession, ClientTimeout
-
-import json
-import asyncio
-import sys
-import os
 import logging
-import Levenshtein as lev
+import os
+import traceback
 
+from discord.ext import commands
+from discord import app_commands, Interaction, Embed, Guild, TextChannel
 
-from . import cogs
-from .utils import Utils
-from .resources import Sessions, Config, G5
-
-
-_CWD = os.path.dirname(os.path.abspath(__file__))
-INTENTS_JSON = os.path.join(_CWD, 'intents.json')
+from .helpers.db import db
+from .helpers.api import api
+from .helpers.configs import Config
+from .helpers.errors import CustomError, APIError
 
 
 class G5Bot(commands.AutoShardedBot):
-    """ Sub-classed AutoShardedBot modified to fit the needs of the application. """
+    """"""
 
-    def __init__(self):
-        """ Set attributes and configure bot. """
-        # Call parent init
-        with open(INTENTS_JSON) as f:
-            intents_attrs = json.load(f)
+    def __init__(self, intents: dict) -> None:
+        super().__init__(command_prefix=commands.when_mentioned_or(
+            Config.prefix), help_command=None, intents=intents)
 
-        intents = discord.Intents(**intents_attrs)
-        super().__init__(command_prefix=Config.prefixes,
-                         case_insensitive=True, intents=intents)
+        self.description = ""
+        self.logger = logging.getLogger('Bot')
+        self.tree.on_error = self.on_app_command_error
 
-        # Set constants
-        self.color = 0x0086FF
-        self.logger = logging.getLogger('G5.bot')
-
-        # Add check to not respond to DM'd commands
-        self.add_check(lambda ctx: ctx.guild is not None)
-
-        # Trigger typing before every command
-        self.before_invoke(commands.Context.trigger_typing)
-
-        G5.bot = self
-
-        # Add cogs
-        for cog in cogs.__all__:
-            self.add_cog(cog())
-
-        self.message_listeners = set()
-
-    async def on_error(self, event_method, *args, **kwargs):
+    async def notify(self, *users, channel: TextChannel):
         """"""
-        try:
-            logging_cog = self.get_cog('LoggingCog')
-            exc_type, exc_value, traceback = sys.exc_info()
-            logging_cog.log_exception(
-                f'Uncaught exception when handling "{event_method}" event:', exc_value)
-        except Exception as e:
-            print(e)
+        message = await channel.send(content=''.join(u.mention for u in users))
+        await message.delete()
 
-    def embed_template(self, **kwargs):
-        """ Implement the bot's default-style embed. """
-        if 'color' not in kwargs:
-            kwargs['color'] = self.color
-        embed = discord.Embed(**kwargs)
-        return embed
+    async def on_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
+        """ Executed every time a slash command catches an error. """
 
-    async def send_dm(self, user, embed):
-        """"""
-        if not user:
-            return
-
-        dm_channel = user.dm_channel or await user.create_dm()
-        try:
-            message = await dm_channel.send(embed=embed)
-        except discord.Forbidden:
-            self.logger.info(
-                f'Unable to send message to user: {user.display_name}')
+        if isinstance(error, app_commands.CommandOnCooldown):
+            minutes, seconds = divmod(error.retry_after, 60)
+            hours, minutes = divmod(minutes, 60)
+            hours = hours % 24
+            hours = f'{round(hours)} hours ' if round(hours) > 0 else ''
+            minutes = f'{round(minutes)} minutes ' if round(minutes) > 0 else ''
+            seconds = f'{round(seconds)} seconds ' if round(seconds) > 0 else ''
+            description = f"**Please slow down** - You can use this command again in {hours}{minutes}{seconds}"
+        elif isinstance(error, (CustomError, APIError)):
+            description = error.message
+        elif isinstance(error, app_commands.MissingPermissions):
+            description = "You are missing the permission(s) `" \
+                + ", ".join(error.missing_permissions) \
+                + "` to execute this command!"
+        elif isinstance(error, app_commands.BotMissingPermissions):
+            description = "I am missing the permission(s) `" \
+                + ", ".join(error.missing_permissions) \
+                + "` to fully perform this command!"
         else:
-            return message
+            description = "Something went wrong, see logs for more details."
+            self.log_exception(
+                f'Unhandled exception in "{interaction.command.name}" command: ', error)
+            
+        embed = Embed(description=description, color=0xE02B2B)
+
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+
+        await interaction.edit_original_response(embed=embed, view=None)
+
+    def log_exception(self, msg, error):
+        """ Logs an exception. """
+        logger_cog = self.get_cog('Logger')
+        logger_cog.log_exception(msg, error)
 
     @commands.Cog.listener()
-    async def on_connect(self):
-        Sessions.requests = ClientSession(
-            loop=self.loop,
-            json_serialize=lambda x: json.dumps(x, ensure_ascii=False),
-            timeout=ClientTimeout(total=5),
-            trace_configs=[cogs.logging.TRACE_CONFIG]
-        )
+    async def on_connect(self) -> None:
+        """"""
+        await db.connect()
+        api.connect(self.loop)
 
     @commands.Cog.listener()
-    async def on_ready(self):
-        """ Synchronize the guilds the bot is in with the guilds table. """
-        match_cog = self.get_cog('MatchCog')
-        stats_cog = self.get_cog('StatsCog')
-        setup_cog = self.get_cog('SetupCog')
-        start = asyncio.get_event_loop().time()
+    async def on_ready(self) -> None:
+        #  Sync guilds' information with the database.
         if self.guilds:
-            print('Synchronizing guilds...')
-            await G5.db.sync_guilds(*(guild.id for guild in self.guilds))
+            await db.sync_guilds([g.id for g in self.guilds])
             for guild in self.guilds:
                 try:
-                    await setup_cog.prepare_server(guild)
-                except Exception as e:
-                    G5.bot.logger.error(
-                        f'Error on preparing server {guild.name} ({guild.id}):\n{e}')
+                    await db.create_default_guild_maps(guild)
+                    await self.check_guild_requirements(guild)
+                except: pass
 
-        if not match_cog.check_live_matches.is_running():
-            match_cog.check_live_matches.start()
+        match_cog = self.get_cog("Match")
+        if match_cog:
+            if not match_cog.check_live_matches.is_running():
+                match_cog.check_live_matches.start()
 
-        if not stats_cog.update_leaderboard.is_running():
-            stats_cog.update_leaderboard.start()
-
-        now = asyncio.get_event_loop().time()
-        self.logger.info(f'guilds Synchronized ({now - start:.2f}s)')
-        self.logger.info(
-            f'Bot is ready to use in {len(self.guilds)} Discord servers.')
-
-    @commands.Cog.listener()
-    async def on_guild_join(self, guild):
-        """ Insert the newly added guild to the guilds table. """
-        await G5.db.sync_guilds(*(guild.id for guild in self.guilds))
-
-    @commands.Cog.listener()
-    async def on_guild_remove(self, guild):
-        """ Delete the recently removed guild from the guilds table. """
-        await G5.db.sync_guilds(*(guild.id for guild in self.guilds))
+        # Sync slash commands
+        guild = self.get_guild(Config.guild_id)
+        if guild:
+            await self.tree.sync(guild=guild)
+            self.tree.copy_global_to(guild=guild)
+        else:
+            self.logger.warning(f"No guild found for id {Config.guild_id}")
+        # Sync commands globally if enabled
+        if Config.sync_commands_globally:
+            self.logger.info("Syncing commands globally...")
+            await self.tree.sync()
 
     @commands.Cog.listener()
-    async def on_command_error(self, ctx, error):
+    async def on_guild_join(self, guild) -> None:
         """"""
-        message = None
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.trigger_typing()
-            missing_perm = error.missing_perms[0].replace('_', ' ')
-            embed = self.embed_template(title=Utils.trans(
-                'command-required-perm', missing_perm), color=0xFF0000)
-            message = await ctx.message.reply(embed=embed)
+        await db.sync_guilds([g.id for g in self.guilds])
+        await db.create_default_guild_maps(guild)
+        await self.check_guild_requirements(guild)
 
-        if isinstance(error, commands.CommandInvokeError):
-            await ctx.trigger_typing()
-            embed = self.embed_template(
-                title=str(error.original), color=0xFF0000)
-            message = await ctx.message.reply(embed=embed)
-
-        if isinstance(error, commands.CommandNotFound):
-            # Get Levenshtein distance from commands
-            in_cmd = ctx.invoked_with
-            bot_cmds = list(self.commands)
-            lev_dists = [lev.distance(in_cmd, str(
-                cmd)) / max(len(in_cmd), len(str(cmd))) for cmd in bot_cmds]
-            lev_min = min(lev_dists)
-
-            # Prep help message title
-            embed_title = Utils.trans('help-not-valid', ctx.message.content)
-            prefixes = self.command_prefix
-            # Prefix can be string or iterable of strings
-            prefix = prefixes[0] if prefixes is not str else prefixes
-
-            # Make suggestion if lowest Levenshtein distance is under threshold
-            if lev_min <= 0.5:
-                embed_title += Utils.trans('help-did-you-mean') + \
-                    f' `{prefix}{bot_cmds[lev_dists.index(lev_min)]}`?'
-            else:
-                embed_title += Utils.trans('help-use-help', prefix)
-
-            embed = self.embed_template(title=embed_title)
-            message = await ctx.message.reply(embed=embed)
-
-        Utils.clear_messages([message, ctx.message])
-
-    def run(self):
-        """ Override parent run to automatically include Discord token. """
-        super().run(Config.discord_token)
+    @commands.Cog.listener()
+    async def on_guild_remove(self, guild) -> None:
+        """"""
+        await db.sync_guilds([g.id for g in self.guilds])
 
     async def close(self):
-        """ Override parent close to close the API session and G5.db connection pool. """
+        """"""
         await super().close()
-        await G5.db.close()
+        await db.close()
+        await api.close()
 
-        self.logger.info('Closing API helper client session')
-        await Sessions.requests.close()
+    async def load_cogs(self) -> None:
+        """ Load extensions in the cogs folder. """
+        _CWD = os.path.dirname(os.path.abspath(__file__))
+        cogs = os.listdir(_CWD + "/cogs")
+        # Move logger cog to the first element in the list to be loaded first.
+        cogs.insert(0, cogs.pop(cogs.index('logger.py')))
+        for file in cogs:
+            if file.endswith(".py"):
+                extension = file[:-3]
+                try:
+                    await self.load_extension(f"bot.cogs.{extension}")
+                    self.logger.info(f"Loaded extension '{extension}'")
+                except Exception as e:
+                    traceback.print_exc()
+                    exception = f"{type(e).__name__}: {e}"
+                    self.logger.error(
+                        f"Failed to load extension {extension}\n{exception}")
+
+    async def check_guild_requirements(self, guild: Guild) -> None:
+        """"""
+        guild_model = await db.get_guild_by_id(guild.id, self)
+        category = guild_model.category
+        linked_role = guild_model.linked_role
+        prematch_channel = guild_model.prematch_channel
+        results_channel = guild_model.results_channel
+
+        if any(x is None for x in [category, linked_role, prematch_channel, results_channel]):
+            if not category:
+                category = await guild.create_category_channel('G5')
+            if not linked_role:
+                linked_role = await guild.create_role(name='Linked')
+            if not prematch_channel:
+                prematch_channel = await guild.create_voice_channel(category=category, name='Pre-Match')
+            if not results_channel:
+                results_channel = await guild.create_text_channel(category=category, name='Results')
+                await results_channel.set_permissions(guild.self_role, send_messages=True)
+                await results_channel.set_permissions(guild.default_role, send_messages=False)
+
+            dict_data = {
+                'category': category.id,
+                'linked_role': linked_role.id,
+                'prematch_channel': prematch_channel.id,
+                'results_channel': results_channel.id
+            }
+            await db.update_guild_data(guild.id, dict_data)
