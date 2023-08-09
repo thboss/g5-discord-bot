@@ -418,6 +418,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
             queued_users += [user]
 
             if len(queued_users) == lobby_model.capacity:
+                title = None
                 guild_model = await db.get_guild_by_id(lobby_model.guild.id, self.bot)
 
                 try:
