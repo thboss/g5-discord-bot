@@ -1,6 +1,6 @@
 # G5 Bot
 
-A Discord bot to manage CS:GO PUGs. Connects to [G5API](https://github.com/PhlexPlexico/G5API).
+A Discord bot to manage CS:GO PUGs and teams matches. Connects to [G5API](https://github.com/PhlexPlexico/G5API).
 
 ## Setup
 
@@ -31,7 +31,7 @@ A Discord bot to manage CS:GO PUGs. Connects to [G5API](https://github.com/Phlex
 
    Quit psql with `\q`
 
-6. Modify configuration settings in `config.json`.
+6. Modify `config.json`.
 
 7. Apply the database migrations by running `python3 migrate.py up`.
 
@@ -39,4 +39,5 @@ A Discord bot to manage CS:GO PUGs. Connects to [G5API](https://github.com/Phlex
 
 ## Thanks To
 
-[Cameron Shinn](https://github.com/cameronshinn) for his initial implementation of csgo-league-bot.
+[Cameron Shinn](https://github.com/cameronshinn) for his initial implementation of [csgo-league-bot](https://github.com/csgo-league/csgo-league-bot).
+[PhlexPlexico](https://github.com/PhlexPlexico/) for his implementation of [G5API](https://github.com/PhlexPlexico/G5API)
