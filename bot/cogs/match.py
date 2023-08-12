@@ -1,7 +1,8 @@
 # match.py
 
 from discord.ext import commands, tasks
-from discord import Embed, NotFound, app_commands, Member, Message, Interaction, Guild, SelectOption, Role
+from discord.errors import HTTPException, NotFound
+from discord import Embed, app_commands, Member, Message, Interaction, Guild, SelectOption, Role
 from typing import Literal, List, Optional
 
 from random import sample, shuffle
@@ -778,15 +779,31 @@ class MatchCog(commands.Cog, name="Match"):
         """"""
         match_catg = await guild.create_category_channel(f"Match #{match_id}")
 
-        team1_channel = await guild.create_voice_channel(
-            name=f"Team {team1_name}",
-            category=match_catg
-        )
-
-        team2_channel = await guild.create_voice_channel(
-            name=f"Team {team2_name}",
-            category=match_catg
-        )
+        try:
+            team1_channel = await guild.create_voice_channel(
+                name=f"Team {team1_name}",
+                category=match_catg
+            )
+        except HTTPException as e:
+            self.bot.logger.warning(e)
+            if e.code == 50035:
+                team1_channel = await guild.create_voice_channel(
+                    name=f"Team 1",
+                    category=match_catg
+                )
+        
+        try:
+            team2_channel = await guild.create_voice_channel(
+                name=f"Team {team2_name}",
+                category=match_catg
+            )
+        except HTTPException as e:
+            self.bot.logger.warning(e)
+            if e.code == 50035:
+                team2_channel = await guild.create_voice_channel(
+                    name=f"Team 2",
+                    category=match_catg
+                )
 
         await team1_channel.set_permissions(guild.self_role, connect=True)
         await team2_channel.set_permissions(guild.self_role, connect=True)
