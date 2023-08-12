@@ -221,9 +221,12 @@ class APIManager:
 
     async def create_team(self, name: str, users_dict: Dict[str, Dict[str, bool]]):
         """"""
+        for u in users_dict:
+            users_dict[u]['name'] = users_dict[u]['name'][:30]
+
         url = "/api/teams"
         data = {
-            'name': 'team_' + name,
+            'name': 'team_' + name[:25],
             'public_team': 0,
             'auth_name': users_dict
         }
@@ -513,6 +516,9 @@ class APIManager:
         Raises:
             APIError: If there was an error with the API request or response.
         """
+
+        for spec in spectators:
+            spectators[spec] = spectators[spec][:30]
 
         url = "/api/matches"
 
