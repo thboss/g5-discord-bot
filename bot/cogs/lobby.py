@@ -3,6 +3,7 @@
 from asyncpg.exceptions import UniqueViolationError
 from typing import List, Optional
 from collections import defaultdict
+import asyncio
 
 from discord.ext import commands
 from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPException, VoiceChannel, SelectOption
@@ -64,6 +65,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
     def __init__(self, bot: G5Bot):
         self.bot = bot
+        self.lock = asyncio.Lock()
         self.awaiting = {}
         self.awaiting = defaultdict(lambda: False, self.awaiting)
 
@@ -386,27 +388,28 @@ class LobbyCog(commands.Cog, name="Lobby"):
         if before.channel == after.channel:
             return
 
-        if before.channel is not None:
-            lobby_model = await db.get_lobby_by_voice_channel(before.channel)
-            if lobby_model and not self.awaiting[lobby_model.id]:
-                self.awaiting[lobby_model.id] = True
-                try:
-                    await self._leave(user, lobby_model)
-                except Exception as e:
-                    self.bot.log_exception(
-                        "Uncaght exception when handling 'cogs.lobby._leave()' method:", e)
-                self.awaiting[lobby_model.id] = False
+        async with self.lock:
+            if before.channel is not None:
+                lobby_model = await db.get_lobby_by_voice_channel(before.channel)
+                if lobby_model and not self.awaiting[lobby_model.id]:
+                    self.awaiting[lobby_model.id] = True
+                    try:
+                        await self._leave(user, lobby_model)
+                    except Exception as e:
+                        self.bot.log_exception(
+                            "Uncaght exception when handling 'cogs.lobby._leave()' method:", e)
+                    self.awaiting[lobby_model.id] = False
 
-        if after.channel is not None:
-            lobby_model = await db.get_lobby_by_voice_channel(after.channel)
-            if lobby_model and lobby_model.text_channel and not self.awaiting[lobby_model.id]:
-                self.awaiting[lobby_model.id] = True
-                try:
-                    await self._join(user, lobby_model)
-                except Exception as e:
-                    self.bot.log_exception(
-                        "Uncaught exception when handling 'cogs.lobby._join()' method:", e)
-                self.awaiting[lobby_model.id] = False
+            if after.channel is not None:
+                lobby_model = await db.get_lobby_by_voice_channel(after.channel)
+                if lobby_model and lobby_model.text_channel and not self.awaiting[lobby_model.id]:
+                    self.awaiting[lobby_model.id] = True
+                    try:
+                        await self._join(user, lobby_model)
+                    except Exception as e:
+                        self.bot.log_exception(
+                            "Uncaught exception when handling 'cogs.lobby._join()' method:", e)
+                    self.awaiting[lobby_model.id] = False
 
     async def _leave(self, user: Member, lobby_model: LobbyModel):
         """"""
