@@ -2,7 +2,7 @@
 
 from discord.ext import commands, tasks
 from discord.errors import HTTPException, NotFound
-from discord import Embed, app_commands, Member, Message, Interaction, Guild, SelectOption, Role
+from discord import Embed, app_commands, Member, Message, Interaction, Guild, SelectOption, Role, PermissionOverwrite
 from typing import Literal, List, Optional
 
 from random import sample, shuffle
@@ -607,6 +607,8 @@ class MatchCog(commands.Cog, name="Match"):
     ):
         """"""
         is_pug = len(queue_users) > 0
+        team1_id = None
+        team2_id = None
         await asyncio.sleep(3)
         try:
             if not is_pug: # official match
@@ -708,7 +710,6 @@ class MatchCog(commands.Cog, name="Match"):
 
         except APIError as e:
             description = e.message
-            self.bot.log_exception('API ERROR: ', e)
         except asyncio.TimeoutError:
             description = 'Setup took too long!'
         except ValueError as e:
@@ -729,15 +730,17 @@ class MatchCog(commands.Cog, name="Match"):
 
         # Delete the created teams from api if setup didn't complete
         if is_pug:
-            try:
-                await api.delete_team(team1_id)
-            except Exception as e:
-                self.bot.logger.warning(str(e))
+            if team1_id:
+                try:
+                    await api.delete_team(team1_id)
+                except Exception as e:
+                    self.bot.logger.warning(str(e))
 
-            try:
-                await api.delete_team(team2_id)
-            except Exception as e:
-                self.bot.logger.warning(str(e))
+            if team2_id:
+                try:
+                    await api.delete_team(team2_id)
+                except Exception as e:
+                    self.bot.logger.warning(str(e))
 
         embed = Embed(title="Match Setup Failed",
                       description=description, color=0xE02B2B)
@@ -778,76 +781,63 @@ class MatchCog(commands.Cog, name="Match"):
     ):
         """"""
         match_catg = await guild.create_category_channel(f"Match #{match_id}")
+        team1_channel, team2_channel = None, None
+        team1_overwrites = {u: PermissionOverwrite(connect=True) for u in team1_users}
+        team1_overwrites[guild.default_role] = PermissionOverwrite(connect=False)
+        team2_overwrites = {u: PermissionOverwrite(connect=True) for u in team2_users}
+        team2_overwrites[guild.default_role] = PermissionOverwrite(connect=False)
 
         try:
             team1_channel = await guild.create_voice_channel(
                 name=f"Team {team1_name}",
-                category=match_catg
+                category=match_catg,
+                overwrites=team1_overwrites
             )
         except HTTPException as e:
             self.bot.logger.warning(e)
             if e.code == 50035:
                 team1_channel = await guild.create_voice_channel(
                     name=f"Team 1",
-                    category=match_catg
+                    category=match_catg,
+                    overwrites=team1_overwrites
                 )
         
         try:
             team2_channel = await guild.create_voice_channel(
                 name=f"Team {team2_name}",
-                category=match_catg
+                category=match_catg,
+                overwrites=team2_overwrites
             )
         except HTTPException as e:
             self.bot.logger.warning(e)
             if e.code == 50035:
                 team2_channel = await guild.create_voice_channel(
                     name=f"Team 2",
-                    category=match_catg
+                    category=match_catg,
+                    overwrites=team2_overwrites
                 )
 
-        await team1_channel.set_permissions(guild.self_role, connect=True)
-        await team2_channel.set_permissions(guild.self_role, connect=True)
-        await team1_channel.set_permissions(guild.default_role, connect=False, read_messages=True)
-        await team2_channel.set_permissions(guild.default_role, connect=False, read_messages=True)
-
+        awaitables = []
         for user in team1_users:
-            try:
-                await team1_channel.set_permissions(user, connect=True)
-                await user.move_to(team1_channel)
-            except Exception as e:
-                pass
-
+            awaitables.append(user.move_to(team1_channel))
         for user in team2_users:
-            try:
-                await team2_channel.set_permissions(user, connect=True)
-                await user.move_to(team2_channel)
-            except Exception as e:
-                pass
+            awaitables.append(user.move_to(team2_channel))
+        await asyncio.gather(*awaitables)
 
         return match_catg, team1_channel, team2_channel
 
     async def finalize_match(self, match_model: MatchModel, guild_model: GuildModel):
         """"""
         match_players = await db.get_match_users(match_model.id, match_model.guild)
-        match_channels = [
-            match_model.team1_channel,
-            match_model.team2_channel,
-            match_model.category
+        move_aws = [user.move_to(guild_model.prematch_channel) for user in match_players]
+        delete_aws = [
+            match_model.team1_channel.delete(),
+            match_model.team2_channel.delete(),
+            match_model.category.delete(),
+            db.delete_match(match_model.id)
         ]
-
-        for user in match_players:
-            try:
-                await user.move_to(guild_model.prematch_channel)
-            except Exception as e:
-                pass
-
-        for channel in match_channels:
-            try:
-                await channel.delete()
-            except Exception as e:
-                pass
-
-        await db.delete_match(match_model.id)
+        await asyncio.gather(*move_aws)
+        await asyncio.gather(*delete_aws)
 
     async def update_match_stats(self, match_model: MatchModel):
         """"""
@@ -858,13 +848,9 @@ class MatchCog(commands.Cog, name="Match"):
         season = None
         guild_model = await db.get_guild_by_id(match_model.guild.id, self.bot)
 
-        if not match_model.text_channel:
-            await self.finalize_match(match_model, guild_model)
-            return
-
         try:
             message = await match_model.text_channel.fetch_message(match_model.message_id)
-        except NotFound:
+        except Exception as e:
             pass
 
         try:
@@ -885,19 +871,26 @@ class MatchCog(commands.Cog, name="Match"):
             mapstats = await api.get_mapstats(match_model.id)
         except Exception as e:
             pass
-
-        season = await api.get_season(match_stats.season_id)
+        
+        if match_stats.season_id:
+            try:
+                season = await api.get_season(match_stats.season_id)
+            except Exception as e:
+                pass
 
         if message:
             embed = self.embed_match_info(match_stats, game_server, mapstats, season)
-            await message.edit(embed=embed)
+            try:
+                await message.edit(embed=embed)
+            except Exception as e:
+                pass
 
         if not match_stats.end_time and not match_stats.cancelled and not match_stats.forfeit:
             return
 
         try:
             await message.delete()
-        except (AttributeError, NotFound):
+        except Exception as e:
             pass
 
         if mapstats and not match_stats.cancelled:
@@ -915,13 +908,15 @@ class MatchCog(commands.Cog, name="Match"):
         live_match = False
         for guild in self.bot.guilds:
             guild_matches = await db.get_guild_matches(guild)
-            for match_model in guild_matches:
+            if guild_matches:
                 live_match = True
-                try:
-                    await self.update_match_stats(match_model)
-                except Exception as e:
-                    self.bot.log_exception(
-                        f'Uncaught exception when handling cogs.match.update_match_stats({match_model.id}):', e)
+                aws = [self.update_match_stats(m) for m in guild_matches]
+                results = await asyncio.gather(*aws, return_exceptions=True)
+                for e in results:
+                    if isinstance(e, Exception):
+                        self.bot.log_exception(
+                            f'Uncaught exception when handling cogs.match.update_match_stats():', e)
+
         if not live_match:
             self.check_live_matches.cancel()
 
