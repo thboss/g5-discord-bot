@@ -89,11 +89,8 @@ LOGGING_CONFIG = {
         'DB': {
             'level': 'DEBUG' if Config.debug else 'INFO',
         },
-        'discord.client': {
-            'level': 'INFO'
-        },
-        'discord.gateway': {
-            'level': 'WARNING'
+        'discord': {
+            'level': 'DEBUG' if Config.debug else 'INFO',
         }
     },
     'root': {
