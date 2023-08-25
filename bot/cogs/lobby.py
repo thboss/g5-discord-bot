@@ -65,8 +65,8 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
     def __init__(self, bot: G5Bot):
         self.bot = bot
-        self.lock = {}
-        self.lock = defaultdict(lambda: asyncio.Lock(), self.lock)
+        self.locks = defaultdict(lambda: asyncio.Lock())
+        self.in_progress = defaultdict(lambda: False)
 
     @app_commands.command(
         name='create-lobby',
@@ -220,7 +220,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         if lobby_model.guild.id != guild.id:
             raise CustomError("This lobby was not created in this server.")
 
-        async with self.lock[lobby_model.id]:
+        async with self.locks[lobby_model.id]:
             for user in lobby_model.voice_channel.members:
                 try:
                     await user.move_to(guild_model.prematch_channel)
@@ -385,96 +385,97 @@ class LobbyCog(commands.Cog, name="Lobby"):
         if before.channel is not None:
             lobby_model = await db.get_lobby_by_voice_channel(before.channel)
             if lobby_model:
-                try:
-                    await self._leave(user, lobby_model)
-                except Exception as e:
-                    self.bot.log_exception(
-                        "Uncaght exception when handling 'cogs.lobby._leave()' method:", e)
+                if not self.in_progress[lobby_model.id]:
+                    async with self.locks[lobby_model.id]:
+                        try:
+                            await self._leave(user, lobby_model)
+                        except Exception as e:
+                            self.bot.log_exception(
+                                "Uncaght exception when handling 'cogs.lobby._leave()' method:", e)
 
         if after.channel is not None:
             lobby_model = await db.get_lobby_by_voice_channel(after.channel)
             if lobby_model and lobby_model.text_channel:
-                try:
-                    await self._join(user, lobby_model)
-                except Exception as e:
-                    self.bot.log_exception(
-                        "Uncaught exception when handling 'cogs.lobby._join()' method:", e)
+                if not self.in_progress[lobby_model.id]:
+                    async with self.locks[lobby_model.id]:
+                        try:
+                            await self._join(user, lobby_model)
+                        except Exception as e:
+                            self.bot.log_exception(
+                                "Uncaught exception when handling 'cogs.lobby._join()' method:", e)
 
     async def _leave(self, user: Member, lobby_model: LobbyModel):
         """"""
-        async with self.lock[lobby_model.id]:
-            removed = await db.delete_lobby_users(lobby_model.id, [user])
-            if removed:
-                title = f"User {user.display_name} removed from the lobby"
-                await self.update_queue_msg(lobby_model, title)
+        removed = await db.delete_lobby_users(lobby_model.id, [user])
+        if removed:
+            title = f"User {user.display_name} removed from the lobby"
+            await self.update_queue_msg(lobby_model, title)
 
     async def _join(self, user: Member, lobby_model: LobbyModel):
         """"""
-        async with self.lock[lobby_model.id]:
-            queued_users = await db.get_lobby_users(lobby_model.id, lobby_model.guild)
-            try:
-                await self.add_user_to_lobby(user, lobby_model, queued_users)
-            except JoinLobbyError as e:
-                title = e.message
-            else:
-                title = f"User **{user.display_name}** added to the queue."
-                queued_users += [user]
+        queued_users = await db.get_lobby_users(lobby_model.id, lobby_model.guild)
+        try:
+            await self.add_user_to_lobby(user, lobby_model, queued_users)
+        except JoinLobbyError as e:
+            title = e.message
+        else:
+            title = f"User **{user.display_name}** added to the queue."
+            queued_users.append(user)
 
-                if len(queued_users) == lobby_model.capacity:
-                    title = None
-                    guild_model = await db.get_guild_by_id(lobby_model.guild.id, self.bot)
+            if len(queued_users) == lobby_model.capacity:
+                self.in_progress[lobby_model.id] = True
+                title = None
+                guild_model = await db.get_guild_by_id(lobby_model.guild.id, self.bot)
+                lobby_model = await db.get_lobby_by_id(lobby_model.id, self.bot)
 
+                try:
+                    queue_msg = await lobby_model.text_channel.fetch_message(lobby_model.message_id)
+                    await queue_msg.delete()
+                except:
+                    pass
+
+                unreadied_users = []
+                if not lobby_model.auto_ready:
+                    ready_view = ReadyView(queued_users, lobby_model.text_channel)
+                    await ready_view.start()
+                    await ready_view.wait()
+                    unreadied_users = set(queued_users) - ready_view.ready_users
                     try:
-                        queue_msg = await lobby_model.text_channel.fetch_message(lobby_model.message_id)
-                    except HTTPException as e:
-                        embed = Embed(description="Lobby message")
-                        queue_msg = await lobby_model.text_channel.send(embed=embed)
-
-                    unreadied_users = []
-                    if not lobby_model.auto_ready:
-                        mentions_msg = await lobby_model.text_channel.send(''.join(u.mention for u in queued_users))
-                        ready_view = ReadyView(queued_users, queue_msg)
-                        await queue_msg.edit(embed=ready_view._embed_ready(), view=ready_view)
-                        await ready_view.wait()
-                        unreadied_users = set(queued_users) - ready_view.ready_users
-                        try:
-                            await mentions_msg.delete()
-                        except Exception as e:
-                            pass
-
-                    try:
-                        await queue_msg.delete()
-                    except Exception as e:
+                        await ready_view.message.delete()
+                    except:
                         pass
 
-                    if unreadied_users:
-                        await db.delete_lobby_users(lobby_model.id, unreadied_users)
-                        await self.move_to_channel(guild_model.prematch_channel, unreadied_users)
-                    else:
-                        embed = Embed(description='Starting match setup...')
-                        setup_match_msg = await lobby_model.text_channel.send(embed=embed)
+                if unreadied_users:
+                    awaitables = [u.move_to(guild_model.prematch_channel) for u in unreadied_users]
+                    awaitables.append(db.delete_lobby_users(lobby_model.id, unreadied_users))
+                    await asyncio.gather(*awaitables)
+                else:
+                    embed = Embed(description='Starting match setup...')
+                    setup_match_msg = await lobby_model.text_channel.send(embed=embed)
 
-                        map_pool = await db.get_lobby_maps(lobby_model.id)
-                        match_cog = self.bot.get_cog('Match')
-                        match_started = await match_cog.start_match(
-                            lobby_model.guild,
-                            setup_match_msg,
-                            map_pool,
-                            queue_users=queued_users,
-                            game_mode=lobby_model.game_mode,
-                            team_method=lobby_model.team_method,
-                            captain_method=lobby_model.captain_method,
-                            map_method=lobby_model.map_method,
-                            series=lobby_model.series,
-                            region=lobby_model.region,
-                            season_id=lobby_model.season_id
-                        )
-                        if not match_started:
-                            await self.move_to_channel(guild_model.prematch_channel, queued_users)
+                    map_pool = await db.get_lobby_maps(lobby_model.id)
+                    match_cog = self.bot.get_cog('Match')
+                    match_started = await match_cog.start_match(
+                        lobby_model.guild,
+                        setup_match_msg,
+                        map_pool,
+                        queue_users=queued_users,
+                        game_mode=lobby_model.game_mode,
+                        team_method=lobby_model.team_method,
+                        captain_method=lobby_model.captain_method,
+                        map_method=lobby_model.map_method,
+                        series=lobby_model.series,
+                        region=lobby_model.region,
+                        season_id=lobby_model.season_id
+                    )
+                    if not match_started:
+                        awaitables = [u.move_to(guild_model.prematch_channel) for u in queued_users]
+                        await asyncio.gather(*awaitables)
 
-                        await db.clear_lobby_users(lobby_model.id)
+                    await db.clear_lobby_users(lobby_model.id)
+                self.in_progress[lobby_model.id] = False
 
-            await self.update_queue_msg(lobby_model, title)
+        await self.update_queue_msg(lobby_model, title)
 
     async def add_user_to_lobby(self, user: Member, lobby_model: LobbyModel, queued_users: List[Member]):
         """"""
@@ -499,6 +500,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         if not lobby_model.text_channel or not lobby_model.voice_channel:
             return
 
+        lobby_model = await db.get_lobby_by_id(lobby_model.id, self.bot)
         queued_users = await db.get_lobby_users(lobby_model.id, lobby_model.guild)
 
         try:
@@ -535,15 +537,6 @@ class LobbyCog(commands.Cog, name="Lobby"):
         if self.bot.user.avatar:
             embed.set_thumbnail(url=self.bot.user.avatar.url)
         return embed
-
-    async def move_to_channel(self, channel: VoiceChannel, users: List[Member]):
-        """"""
-        for user in users:
-            try:
-                await user.move_to(channel)
-            except HTTPException as e:
-                self.bot.logger.warning(
-                    f"Unable to move user \"{user.display_name}\" to voice channel \"{channel.name}\": {e.text}")
 
 
 async def setup(bot: G5Bot):

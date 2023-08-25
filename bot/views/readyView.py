@@ -1,16 +1,17 @@
 # readyView.py
 
-from discord import Interaction, Member, Message, ButtonStyle, Embed
+from discord import Interaction, Member, TextChannel, ButtonStyle, Embed
 from discord.ui import View, Button, button
 from typing import List
 
 
 class ReadyView(View):
-    def __init__(self, users: List[Member], message: Message, timeout=60):
+    def __init__(self, users: List[Member], channel: TextChannel, timeout=60):
         super().__init__(timeout=timeout)
         self.users = users
+        self.channel = channel
         self.ready_users = set()
-        self.message = message
+        self.message = None
 
     @property
     def all_ready(self):
@@ -47,3 +48,10 @@ class ReadyView(View):
         embed.add_field(name="__Status__", value=statuses)
         embed.set_footer(text="Click the button below when you are ready.")
         return embed
+    
+    async def start(self):
+        self.message = await self.channel.send(
+            content=''.join(u.mention for u in self.users),
+            embed=self._embed_ready(),
+            view=self
+        )
