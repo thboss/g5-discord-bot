@@ -4,3 +4,4 @@ asyncpg>=0.20.1
 psycopg2-binary>=2.8.5
 yoyo-migrations>=7.0.2
 steam>=1.2.0
+git+https://github.com/thboss/discord.py-paginator

@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from paginator import Paginator
 
 from bot.bot import G5Bot
 
@@ -14,7 +15,7 @@ class Help(commands.Cog):
     async def help(self, interaction: discord.Interaction):
         """"""
         await interaction.response.defer(ephemeral=True)
-        embeds = []
+        pages = []
         all_commands = await self.bot.tree.fetch_commands()
 
         for cog_name, cog in self.bot.cogs.items():
@@ -27,9 +28,13 @@ class Help(commands.Cog):
                     if c.name == cmd.name:
                         embed.add_field(name=c.mention,
                                         value=c.description, inline=False)
-            embeds.append(embed)
+            pages.append({
+                'label': f"{cog_name} Commands",
+                'content': embed
+            })
 
-        await interaction.followup.send(embeds=embeds, ephemeral=True)
+        paginator = Paginator(interaction, pages)
+        await paginator.start(embeded=True, quick_navigation=len(pages) <= 25, followup=True)
 
 
 async def setup(bot):
