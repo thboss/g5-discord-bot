@@ -3,7 +3,7 @@
 from discord.ext import commands
 from discord import app_commands, Interaction, Embed, SelectOption, Role
 from discord.interactions import Interaction
-
+from paginator import Paginator
 
 from bot.bot import G5Bot
 from bot.helpers.errors import CustomError
@@ -243,6 +243,33 @@ class TeamCog(commands.Cog, name="Team"):
             embed.description = "Delete team cancelled."
         
         await interaction.edit_original_response(embed=embed, view=None)
+
+    @app_commands.command(name="team-list", description="Show list of teams in the server")
+    async def team_list(self, interaction: Interaction):
+        """"""
+        await interaction.response.defer(ephemeral=True)
+        teams = await db.get_guild_teams(interaction.guild)
+
+        if not teams:
+            raise CustomError("No teams found in the server")
+        
+        pages = []
+        for team_model in teams:
+            title = f"Team {team_model.name} (#{team_model.id})"
+            description = f"\n\n**Players:**\n"
+            team_users = await db.get_team_users(team_model.id, interaction.guild)
+            for index, user in enumerate(team_users, start=1):
+                if user == team_model.captain:
+                    description += f'{index}. {user.mention} `👑`\n'
+                else:
+                    description += f'{index}. {user.mention}\n'
+            pages.append({
+                'label': f"Team {team_model.name}",
+                'content': Embed(title=title, description=description)
+            })
+
+        paginator = Paginator(interaction, pages)
+        await paginator.start(embeded=True, quick_navigation=len(pages) <= 25, followup=True)
 
 
 async def setup(bot):
