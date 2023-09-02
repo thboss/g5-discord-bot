@@ -76,9 +76,9 @@ class MatchCog(commands.Cog, name="Match"):
     ):
         """"""
         embed = Embed()
+        map_pool = await self.select_mpool(author, guild_maps, series, interaction)
         team1_users = await self.select_team_participants(team1_model, capacity, interaction)
         team2_users = await self.select_team_participants(team2_model, capacity, interaction)
-        map_pool = await self.select_mpool(author, guild_maps, series, interaction)
 
         embed.add_field(name=f"Team {team1_model.name}", value="\n".join(u.mention for u in team1_users))
         embed.add_field(name=f"Team {team2_model.name}", value="\n".join(u.mention for u in team2_users))
@@ -87,13 +87,8 @@ class MatchCog(commands.Cog, name="Match"):
         await asyncio.sleep(3)
         
         match_users = team1_users + team2_users
-        ready_view = ReadyView(match_users, message)
-        message = await interaction.edit_original_response(
-            content=''.join(u.mention for u in match_users),
-            embed=ready_view._embed_ready(),
-            view=ready_view
-        )
-        await self.bot.notify(*match_users, channel=interaction.channel)
+        ready_view = ReadyView(match_users, interaction.channel)
+        await ready_view.start()
         await ready_view.wait()
         unreadied_users = set(match_users) - ready_view.ready_users
 
@@ -198,7 +193,7 @@ class MatchCog(commands.Cog, name="Match"):
         interaction: Interaction,
         team: Role,
         capacity: app_commands.Choice[int],
-        series: app_commands.Choice[str],
+        series: List[app_commands.Choice[str]],
         game_mode: app_commands.Choice[str]
     ):
         """"""

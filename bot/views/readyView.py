@@ -22,7 +22,17 @@ class ReadyView(View):
         self.ready_users.add(interaction.user)
         await self.message.edit(embed=self._embed_ready())
         if self.all_ready:
+            try:
+                await self.message.delete()
+            except:
+                pass
             self.stop()
+
+    async def on_timeout(self):
+        try:
+            await self.message.delete()
+        except:
+            pass
 
     async def interaction_check(self, interaction: Interaction):
         await interaction.response.defer()

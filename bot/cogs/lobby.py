@@ -440,10 +440,6 @@ class LobbyCog(commands.Cog, name="Lobby"):
                     await ready_view.start()
                     await ready_view.wait()
                     unreadied_users = set(queued_users) - ready_view.ready_users
-                    try:
-                        await ready_view.message.delete()
-                    except:
-                        pass
 
                 if unreadied_users:
                     awaitables = [u.move_to(guild_model.prematch_channel) for u in unreadied_users]
