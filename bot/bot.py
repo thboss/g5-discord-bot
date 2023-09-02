@@ -81,7 +81,6 @@ class G5Bot(commands.AutoShardedBot):
             await db.sync_guilds([g.id for g in self.guilds])
             for guild in self.guilds:
                 try:
-                    await db.create_default_guild_maps(guild)
                     await self.check_guild_requirements(guild)
                 except: pass
 
@@ -106,7 +105,6 @@ class G5Bot(commands.AutoShardedBot):
     async def on_guild_join(self, guild) -> None:
         """"""
         await db.sync_guilds([g.id for g in self.guilds])
-        await db.create_default_guild_maps(guild)
         await self.check_guild_requirements(guild)
 
     @commands.Cog.listener()

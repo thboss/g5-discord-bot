@@ -7,8 +7,7 @@ from typing import List, Union, Optional
 import discord
 
 from bot.helpers.configs import Config
-from bot.helpers.utils import DEFAULT_MAPS
-from bot.helpers.models import LobbyModel, MapModel, MatchModel, GuildModel, UserModel, TeamModel
+from bot.helpers.models import LobbyModel, MatchModel, GuildModel, UserModel, TeamModel
 
 
 class DBManager:
@@ -275,65 +274,38 @@ class DBManager:
         sql = f"DELETE FROM queued_users WHERE lobby_id = $1;"
         await self.query(sql, lobby_id)
 
-    async def get_lobby_maps(self, lobby_id: int) -> List[MapModel]:
+    async def get_lobby_maps(self, lobby_id: int) -> List[str]:
         """"""
-        sql = "SELECT gm.*\n" \
-            "FROM lobby_maps lm\n" \
-            "JOIN guild_maps gm\n" \
-            "   ON lm.map_id = gm.map_id\n" \
-            "WHERE lobby_id = $1;"
-        maps_data = await self.query(sql, lobby_id)
-        return [MapModel.from_dict(data) for data in maps_data]
+        sql = "SELECT map_name FROM lobby_maps WHERE lobby_id = $1;"
+        result = await self.query(sql, lobby_id)
+        return [m['map_name'] for m in result]
 
     async def clear_lobby_maps(self, lobby_id: int) -> None:
         """"""
         sql = "DELETE FROM lobby_maps WHERE lobby_id = $1;"
         await self.query(sql, lobby_id)
 
-    async def insert_lobby_maps(self, lobby_id: int, maps: List[MapModel]) -> None:
+    async def insert_lobby_maps(self, lobby_id: int, maps: List[str]) -> None:
         """"""
-        values = f", ".join(
-            f"({lobby_id}, {m.map_id})" for m in maps)
-        sql = f"INSERT INTO lobby_maps (lobby_id, map_id) VALUES {values};"
+        values = f", ".join(f"({lobby_id}, '{m}')" for m in maps)
+        sql = f"INSERT INTO lobby_maps (lobby_id, map_name) VALUES {values};"
         await self.query(sql)
 
-    async def update_lobby_maps(self, lobby_id: int, new_maps: List[MapModel], existing_maps: List[MapModel]) -> None:
+    async def delete_lobby_maps(self, lobby_id: int, maps: List[str]) -> None:
         """"""
-        existing_map_ids = [m.map_id for m in existing_maps]
-        new_map_ids = [m.map_id for m in new_maps]
-        delete_map_ids = list(set(existing_map_ids) - set(new_map_ids))
-        insert_map_ids = list(set(new_map_ids) - set(existing_map_ids))
+        sql = "DELETE FROM lobby_maps WHERE lobby_id = $1 AND map_name = ANY($2);"
+        await self.query(sql, lobby_id, maps)
 
-        if delete_map_ids:
-            delete_sql = "DELETE FROM lobby_maps WHERE lobby_id = $1 AND map_id = ANY($2);"
-            await self.query(delete_sql, lobby_id, delete_map_ids)
-
-        if insert_map_ids:
-            values = ", ".join(
-                f"({lobby_id}, {map_id})" for map_id in insert_map_ids)
-            insert_sql = f"INSERT INTO lobby_maps (lobby_id, map_id) VALUES {values};"
-            await self.query(insert_sql)
-
-    async def get_lobby_cvars(self, lobby_id: int) -> dict:
+    async def update_lobby_maps(self, lobby_id: int, new_maps: List[str], existing_maps: List[str]) -> None:
         """"""
-        sql = "SELECT name, value FROM lobby_cvars WHERE lobby_id = $1;"
-        query = await self.query(sql, lobby_id)
-        return {r['name']: r['value'] for r in query}
+        delete_maps = list(set(existing_maps) - set(new_maps))
+        insert_maps = list(set(new_maps) - set(existing_maps))
 
-    async def insert_lobby_cvar(self, lobby_id: int, key: str, value: str) -> None:
-        """"""
-        sql = f"INSERT INTO lobby_cvars VALUES ($1, $2, $3);"
-        await self.query(sql, key, value, lobby_id)
+        if delete_maps:
+            await self.delete_lobby_maps(lobby_id, delete_maps)
 
-    async def update_lobby_cvar(self, lobby_id: int, key: str, value: str) -> None:
-        """"""
-        sql = f"UPDATE lobby_cvars SET value = $1 WHERE name = $2 AND lobby_id = $3;"
-        await self.query(sql, value, key, lobby_id)
-
-    async def delete_lobby_cvar(self, lobby_id: int, key: str) -> None:
-        """"""
-        sql = f"DELETE FROM lobby_cvars WHERE name = $1 AND lobby_id = $2;"
-        await self.query(sql, key, lobby_id)
+        if insert_maps:
+            await self.insert_lobby_maps(lobby_id, insert_maps)
 
     async def get_guild_by_id(self, guild_id: int, bot) -> Union["GuildModel", None]:
         """"""
@@ -352,58 +324,6 @@ class DBManager:
             f'    SET {col_vals}\n' \
             f'    WHERE id = $1;'
         await self.query(sql, guild_id)
-
-    async def get_guild_maps(self, guild: discord.Guild, game_mode: str) -> List[MapModel]:
-        """"""
-        sql = "SELECT * FROM guild_maps\n" \
-            f"    WHERE guild_id = $1 AND game_mode = $2;"
-        maps_data = await self.query(sql, guild.id, game_mode)
-        return [MapModel.from_dict(map_data) for map_data in maps_data]
-
-    async def insert_guild_maps(self, guild: discord.Guild, maps: List[MapModel], game_mode: str) -> None:
-        """"""
-        values = f", ".join(
-            f"('{m.display_name}', '{m.dev_name}', {guild.id}, '{game_mode}')" for m in maps)
-        sql = "INSERT INTO guild_maps (display_name, dev_name, guild_id, game_mode) \n" \
-            f"VALUES {values};"
-        await self.query(sql)
-
-    async def delete_guild_maps(self, guild: discord.Guild, maps: List[MapModel], game_mode: str):
-        """"""
-        maps_dev_names = ','.join([f"'{m.dev_name}'" for m in maps])
-        sql = f"DELETE FROM guild_maps WHERE dev_name IN ({maps_dev_names}) AND guild_id = $1 AND game_mode = $2;"
-        await self.query(sql, guild.id, game_mode)
-
-    async def create_custom_guild_map(self, guild: discord.Guild, display_name: str, dev_name: str, game_mode: str) -> bool:
-        """"""
-        existing_maps = await self.get_guild_maps(guild, game_mode)
-        for m in existing_maps:
-            if m.dev_name == dev_name:
-                return False
-
-        await self.insert_guild_maps(guild, [MapModel(
-            display_name,
-            dev_name,
-            game_mode
-        )],
-        game_mode)
-        return True
-
-    async def create_default_guild_maps(self, guild: discord.Guild) -> None:
-        """"""
-        for game_mode, maps in DEFAULT_MAPS.items():
-            existing_maps = await self.get_guild_maps(guild, game_mode)
-            if existing_maps:
-                continue
-            default_maps = [MapModel(display_name, dev_name, game_mode)
-                            for dev_name, display_name in maps.items()]
-
-            existing_map_dev_names = [m.dev_name for m in existing_maps]
-            new_maps = [
-                m for m in default_maps if m.dev_name not in existing_map_dev_names]
-
-            if new_maps:
-                await self.insert_guild_maps(guild, new_maps, game_mode)
 
     async def get_team_by_id(self, team_id: int, bot) -> Union["TeamModel", None]:
         """"""

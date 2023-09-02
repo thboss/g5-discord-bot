@@ -107,33 +107,12 @@ steps = [
     ),
     step(
         (
-            'CREATE TABLE guild_maps(\n'
-            '    map_id SERIAL PRIMARY KEY,\n'
-            '    guild_id BIGINT REFERENCES guilds (id) ON DELETE CASCADE,\n'
-            '    display_name VARCHAR(65) DEFAULT NULL,\n'
-            '    dev_name VARCHAR(65) DEFAULT NULL\n'
-            ');'
-        ),
-        'DROP TABLE guild_maps;'
-    ),
-    step(
-        (
             'CREATE TABLE lobby_maps(\n'
-            '    map_id INTEGER REFERENCES guild_maps (map_id) ON DELETE CASCADE,\n'
+            '    map_name VARCHAR(32) NOT NULL,\n'
             '    lobby_id INTEGER REFERENCES lobbies (id) ON DELETE CASCADE,\n'
-            '    CONSTRAINT lobby_maps_pkey PRIMARY KEY (lobby_id, map_id)\n'
+            '    CONSTRAINT lobby_maps_pkey PRIMARY KEY (lobby_id, map_name)\n'
             ');'
         ),
         'DROP TABLE lobby_maps;'
-    ),
-    step(
-        (
-            'CREATE TABLE lobby_cvars(\n'
-            '    name VARCHAR(128) NOT NULL,\n'
-            '    value VARCHAR(256) NOT NULL,\n'
-            '    lobby_id INTEGER REFERENCES lobbies (id) ON DELETE CASCADE\n'
-            ');'
-        ),
-        'DROP TABLE lobby_cvars;'
     )
 ]

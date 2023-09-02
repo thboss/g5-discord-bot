@@ -6,7 +6,7 @@ from collections import defaultdict
 import asyncio
 
 from discord.ext import commands
-from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPException, VoiceChannel, SelectOption
+from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPException, SelectOption
 
 from bot.helpers.db import db
 from bot.helpers.api import api
@@ -15,6 +15,7 @@ from bot.helpers.errors import CustomError, JoinLobbyError
 from bot.views import ReadyView, DropDownView
 from bot.bot import G5Bot
 from bot.helpers.utils import COUNTRY_FLAGS
+from bot.helpers.configs import Config
 
 
 CAPACITY_CHOICES = [
@@ -151,10 +152,10 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
         await category.edit(name=f"Lobby #{lobby_id}")
 
-        guild_maps = await db.get_guild_maps(guild, game_mode.value)
-        lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
-        await db.insert_lobby_maps(lobby_id, guild_maps[:7])
+        all_maps = list(Config.maps[game_mode.value].keys())
+        await db.insert_lobby_maps(lobby_id, all_maps[:7])
 
+        lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
         await self.update_queue_msg(lobby_model)
 
         embed = Embed(
@@ -233,7 +234,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         embed = Embed(description=f"Lobby #{lobby_model.id} has been emptied.")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name='edit-map-pool', description='Modify map pool')
+    @app_commands.command(name='map-pool', description='Modify map pool')
     @app_commands.describe(lobby_id="Lobby ID.")
     @app_commands.checks.has_permissions(administrator=True)
     async def mpool(self, interaction: Interaction, lobby_id: int):
@@ -247,17 +248,18 @@ class LobbyCog(commands.Cog, name="Lobby"):
         if not lobby_model or lobby_model.guild.id != guild.id:
             raise CustomError("Invalid Lobby ID")
 
-        guild_maps = await db.get_guild_maps(guild, lobby_model.game_mode)
+        all_maps = Config.maps[lobby_model.game_mode]
         lobby_maps = await db.get_lobby_maps(lobby_id)
+    
         placeholder = "Select maps from the list"
         options = [
             SelectOption(
-                label=map_model.display_name,
-                value=map_model.map_id,
-                default=map_model in lobby_maps
-            ) for map_model in guild_maps
+                label=display_name,
+                value=map_name,
+                default=map_name in lobby_maps
+            ) for map_name, display_name in all_maps.items()
         ]
-        max_maps = len(guild_maps) if lobby_model.series == "bo1" else 7
+        max_maps = len(all_maps) if lobby_model.series == "bo1" else 7
         dropdown = DropDownView(user, placeholder, options, 7, max_maps)
         message = await interaction.followup.send(view=dropdown, wait=True)
         await dropdown.wait()
@@ -267,71 +269,12 @@ class LobbyCog(commands.Cog, name="Lobby"):
             await message.edit(embed=embed, view=None)
             return
         
-        active_maps = list(filter(lambda x: str(x.map_id) in dropdown.selected_options, guild_maps))
+        active_maps = list(filter(lambda x: x in dropdown.selected_options, all_maps.keys()))
         await db.update_lobby_maps(lobby_id, active_maps, lobby_maps)
 
         embed.description = f"Map pool for lobby **#{lobby_id}** updated successfully."
-        embed.add_field(name="Active Maps", value='\n'.join(m.display_name for m in active_maps))
+        embed.add_field(name="Active Maps", value='\n'.join(Config.maps[lobby_model.game_mode][m] for m in active_maps))
         await message.edit(embed=embed, view=None)
-
-    @app_commands.command(name="add-map", description="Add a custom map")
-    @app_commands.describe(
-        display_name="Display map name. e.g. Dust II",
-        dev_name="Map name in CS:GO. e.g. de_dust2",
-    )
-    @app_commands.choices(game_mode=GAME_MODE_CHOICES)
-    @app_commands.checks.has_permissions(administrator=True)
-    async def add_custom_map(
-        self,
-        interaction: Interaction,
-        display_name: str,
-        dev_name: str,
-        game_mode: app_commands.Choice[str]
-    ):
-        """"""
-        await interaction.response.defer(ephemeral=True)
-        embed = Embed()
-        guild_maps = await db.get_guild_maps(interaction.guild, game_mode.value)
-        count_maps = len(guild_maps)
-
-        if count_maps == 23:
-            raise CustomError("You have 23 maps, you cannot add more!")
-
-        map_added = await db.create_custom_guild_map(
-            interaction.guild, display_name, dev_name, game_mode.value
-        )
-
-        if map_added:
-            embed.description = f"Map **{display_name}** added successfully `{count_maps + 1}/23`"
-        else:
-            embed.description = f"Map **{display_name}** already exists `{count_maps}/23`"
-
-        await interaction.followup.send(embed=embed, ephemeral=True)
-
-    @app_commands.command(name='remove-map', description='Remove a custom map')
-    @app_commands.describe(dev_name='Map name in CS:GO. e.g. de_dust2')
-    @app_commands.choices(game_mode=GAME_MODE_CHOICES)
-    @app_commands.checks.has_permissions(administrator=True)
-    async def remove_custom_map(
-        self,
-        interaction: Interaction,
-        dev_name: str,
-        game_mode: app_commands.Choice[str]
-    ):
-        """"""
-        await interaction.response.defer(ephemeral=True)
-        guild_maps = await db.get_guild_maps(interaction.guild, game_mode.value)
-        count_maps = len(guild_maps)
-        guild_maps = list(filter(lambda x: x.dev_name == dev_name, guild_maps))
-
-        if not guild_maps:
-            raise CustomError("Map not exist!")
-
-        await db.delete_guild_maps(interaction.guild, guild_maps, game_mode.value)
-
-        description = f'Map removed successfully `{count_maps-1}/23`'
-        embed = Embed(description=description)
-        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="add-spectator", description="Add a user to the matches")
     @app_commands.checks.has_permissions(administrator=True)
@@ -444,7 +387,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
                 if unreadied_users:
                     awaitables = [u.move_to(guild_model.prematch_channel) for u in unreadied_users]
                     awaitables.append(db.delete_lobby_users(lobby_model.id, unreadied_users))
-                    await asyncio.gather(*awaitables)
+                    await asyncio.gather(*awaitables, return_exceptions=True)
                 else:
                     embed = Embed(description='Starting match setup...')
                     setup_match_msg = await lobby_model.text_channel.send(embed=embed)
@@ -466,7 +409,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
                     )
                     if not match_started:
                         awaitables = [u.move_to(guild_model.prematch_channel) for u in queued_users]
-                        await asyncio.gather(*awaitables)
+                        await asyncio.gather(*awaitables, return_exceptions=True)
 
                     await db.clear_lobby_users(lobby_model.id)
                 self.in_progress[lobby_model.id] = False

@@ -1,7 +1,7 @@
 # match.py
 
 from discord.ext import commands, tasks
-from discord.errors import HTTPException, NotFound
+from discord.errors import HTTPException
 from discord import Embed, app_commands, Member, Message, Interaction, Guild, SelectOption, Role, PermissionOverwrite
 from typing import Literal, List, Optional
 
@@ -11,7 +11,7 @@ import asyncio
 
 from bot.helpers.api import api, Match, MapStat, Server, Season
 from bot.helpers.db import db
-from bot.helpers.models import GuildModel, TeamModel, MatchModel, MapModel
+from bot.helpers.models import GuildModel, TeamModel, MatchModel
 from bot.bot import G5Bot
 from bot.helpers.errors import CustomError, APIError
 from bot.helpers.configs import Config
@@ -47,11 +47,17 @@ class MatchCog(commands.Cog, name="Match"):
 
         return list(filter(lambda x: str(x.id) in dropdown.selected_options, team_users))
     
-    async def select_mpool(self, user: Member, guild_maps: List[MapModel], series: str, interaction: Interaction) -> List[MapModel]:
+    async def select_mpool(self, user: Member, game_mode: str, series: str, interaction: Interaction) -> List[str]:
         """"""
         placeholder = "Select map pool"
-        options = [SelectOption(label=m.display_name, value=m.map_id) for m in guild_maps]
-        max_maps = len(guild_maps) if series == "bo1" else 7
+        all_maps = Config.maps[game_mode]
+        options = [
+            SelectOption(
+                label=display_name,
+                value=map_name
+            ) for map_name, display_name in all_maps.items()
+        ]
+        max_maps = len(all_maps) if series == "bo1" else 7
         dropdown = DropDownView(user, placeholder, options, 7, max_maps)
         await interaction.edit_original_response(content=user.mention, view=dropdown)
         await self.bot.notify(user, channel=interaction.channel)
@@ -60,7 +66,7 @@ class MatchCog(commands.Cog, name="Match"):
         if not dropdown.selected_options:
             raise CustomError("Timeout! You haven't selected maps in time!")
         
-        return list(filter(lambda x: str(x.map_id) in dropdown.selected_options, guild_maps))
+        return list(filter(lambda x: x in dropdown.selected_options, all_maps.keys()))
     
     async def setup_teams_match(
         self,
@@ -71,18 +77,17 @@ class MatchCog(commands.Cog, name="Match"):
         series: Literal["bo1", "bo2", "bo3"],
         game_mode: Literal["competitive", "wingman"],
         author: Member,
-        guild_maps: List[MapModel],
         season_id: int=None
     ):
         """"""
         embed = Embed()
-        map_pool = await self.select_mpool(author, guild_maps, series, interaction)
+        map_pool = await self.select_mpool(author, game_mode, series, interaction)
         team1_users = await self.select_team_participants(team1_model, capacity, interaction)
         team2_users = await self.select_team_participants(team2_model, capacity, interaction)
 
         embed.add_field(name=f"Team {team1_model.name}", value="\n".join(u.mention for u in team1_users))
         embed.add_field(name=f"Team {team2_model.name}", value="\n".join(u.mention for u in team2_users))
-        embed.add_field(name="Map Pool", value="\n".join(m.display_name for m in map_pool))
+        embed.add_field(name="Map Pool", value="\n".join(Config.maps[game_mode][m] for m in map_pool))
         message = await interaction.edit_original_response(embed=embed, view=None)
         await asyncio.sleep(3)
         
@@ -143,7 +148,6 @@ class MatchCog(commands.Cog, name="Match"):
         """"""
         await interaction.response.defer()
         user = interaction.user
-        guild = interaction.guild
         team_capacity = int(capacity.value // 2)
 
         team1_model = await db.get_team_by_role(team1, self.bot)
@@ -158,10 +162,6 @@ class MatchCog(commands.Cog, name="Match"):
             season = await api.get_season(season_id)
             if not season:
                 raise CustomError(f"Season #{season_id} not found.")
-
-        guild_maps = await db.get_guild_maps(guild, game_mode.value)
-        if len(guild_maps) < 7:
-            raise CustomError("No maps found in the server. Please use command `/add-map` to add **at least 7** maps.")
         
         await self.setup_teams_match(
             team1_model,
@@ -171,7 +171,6 @@ class MatchCog(commands.Cog, name="Match"):
             series.value,
             game_mode.value,
             user,
-            guild_maps,
             season_id
         )
 
@@ -215,10 +214,6 @@ class MatchCog(commands.Cog, name="Match"):
         if team1_model.id == team2_model.id:
             raise CustomError("Opps! You can't challenge your team.")
 
-        guild_maps = await db.get_guild_maps(guild, game_mode.value)
-        if len(guild_maps) < 7:
-            raise CustomError("No maps found in the server.")
-
         embed.description = f"Team **{team1_model.name}** wants to challenge your team **{team2_model.name}**"
         confirm = ConfirmView(team2_model.captain)
         await interaction.edit_original_response(content=team2_model.captain.mention, embed=embed, view=confirm)
@@ -238,8 +233,7 @@ class MatchCog(commands.Cog, name="Match"):
             interaction,
             series.value,
             game_mode.value,
-            user,
-            guild_maps
+            user
         )
 
     @app_commands.command(name="cancel-match", description="Cancel a live match")
@@ -588,7 +582,7 @@ class MatchCog(commands.Cog, name="Match"):
         self,
         guild: Guild,
         message: Message,
-        mpool: List[MapModel],
+        mpool: List[str],
         game_mode: str='competitive',
         queue_users: List[Member]=[], 
         team_method: str='captains',
@@ -643,19 +637,20 @@ class MatchCog(commands.Cog, name="Match"):
                 team2_id = await api.create_team(team2_name, dict_team2_users)
 
             if map_method == 'veto':
-                veto_view = VetoView(message, mpool, series, team1_captain, team2_captain)
+                veto_view = VetoView(message, mpool, series, team1_captain, team2_captain, game_mode)
                 await message.edit(embed=veto_view.embed_veto(), view=veto_view)
                 await veto_view.wait()
-                if not veto_view.is_veto_done:
-                    raise asyncio.TimeoutError
                 maps_list = veto_view.maps_pick
             else:
                 maps_list = sample(mpool, int(series[2]))
 
-            str_maps = ' '.join(m.dev_name for m in maps_list)
+            str_maps = ' '.join(m for m in maps_list)
+
             await message.edit(embed=Embed(description='Searching for available game servers...'), view=None)
             await asyncio.sleep(2)
+
             match_server = await self.find_match_server(region)
+
             await message.edit(embed=Embed(description='Setting up match on game server...'), view=None)
             await asyncio.sleep(2)
 
@@ -817,7 +812,7 @@ class MatchCog(commands.Cog, name="Match"):
             awaitables.append(user.move_to(team1_channel))
         for user in team2_users:
             awaitables.append(user.move_to(team2_channel))
-        await asyncio.gather(*awaitables)
+        await asyncio.gather(*awaitables, return_exceptions=True)
 
         return match_catg, team1_channel, team2_channel
 
@@ -831,8 +826,8 @@ class MatchCog(commands.Cog, name="Match"):
             match_model.category.delete(),
             db.delete_match(match_model.id)
         ]
-        await asyncio.gather(*move_aws)
-        await asyncio.gather(*delete_aws)
+        await asyncio.gather(*move_aws, return_exceptions=True)
+        await asyncio.gather(*delete_aws, return_exceptions=True)
 
     async def update_match_stats(self, match_model: MatchModel):
         """"""

@@ -4,7 +4,7 @@ Add spectators table
 
 from yoyo import step
 
-__depends__ = {'20230801_01_3K32i'}
+__depends__ = {'20230729_01_hno5l'}
 
 steps = [
     step(

@@ -18,6 +18,7 @@ class Config:
     guild_id = config['bot']['guild_id']
     sync_commands_globally = config['bot']['sync_commands_globally']
     debug = config['bot']['debug']
+    maps = config['bot']['maps']
     base_url = config['web']['base_url']
     api_key = config['web']['api_key']
     POSTGRESQL_USER = config['db']['user']

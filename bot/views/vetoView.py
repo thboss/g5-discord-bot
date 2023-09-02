@@ -3,15 +3,16 @@
 from discord import Interaction, Member, Message, ButtonStyle, Embed
 from discord.ui import View, Button
 import random
+import asyncio
 from typing import List, Literal
 
-from bot.helpers.models import MapModel
+from bot.helpers.configs import Config
 
 
 class MapButton(Button['VetoView']):
-    def __init__(self, selected_map: MapModel):
+    def __init__(self, selected_map: str, display_name: str):
         super().__init__(style=ButtonStyle.secondary,
-                         label=selected_map.display_name)
+                         label=display_name)
         self.selected_map = selected_map
 
     async def callback(self, interaction: Interaction):
@@ -21,10 +22,11 @@ class MapButton(Button['VetoView']):
 class VetoView(View):
     def __init__(self,
         message: Message,
-        mpool: List[MapModel],
+        mpool: List[str],
         series: Literal["bo1", "bo2", "bo3"],
         captain1: Member,
         captain2: Member,
+        game_mode: Literal["competitive", "wingman"],
         timeout=180
     ):
         super().__init__(timeout=timeout)
@@ -36,8 +38,9 @@ class VetoView(View):
         self.maps_left = mpool
         self.maps_pick = []
         self.maps_ban = []
+        self.game_mode = game_mode
         for m in mpool:
-            self.add_item(MapButton(m))
+            self.add_item(MapButton(m, Config.maps[game_mode][m]))
 
     @property
     def _active_picker(self):
@@ -72,6 +75,9 @@ class VetoView(View):
         return (self.series == 'bo3' and len(self.maps_pick) == 3) or \
             (self.series == 'bo2' and len(self.maps_pick) == 2) or \
             (self.series == 'bo1' and len(self.maps_pick) == 1)
+    
+    async def on_timeout(self):
+        raise asyncio.TimeoutError
     
     async def interaction_check(self, interaction: Interaction):
         await interaction.response.defer()
@@ -130,7 +136,7 @@ class VetoView(View):
         button.disabled = True
         self.ban_number += 1
 
-        title = f"Player {user.display_name} **{action}** map **{selected_map.display_name}**"
+        title = f"Player {user.display_name} **{action}** map **{Config.maps[self.game_mode][selected_map]}**"
         embed = self.embed_veto(title)
         await self.message.edit(embed=embed, view=None if self.is_veto_done else self)
 
