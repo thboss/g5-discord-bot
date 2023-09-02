@@ -24,7 +24,7 @@ class DropDownItems(Select):
     async def callback(self, interaction: Interaction):
         await interaction.response.defer()
         self.view.selected_options = self.values
-        await self.view.stop()
+        self.view.stop()
 
 
 class DropDownView(View):
