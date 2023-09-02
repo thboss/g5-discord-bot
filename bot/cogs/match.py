@@ -193,7 +193,7 @@ class MatchCog(commands.Cog, name="Match"):
         interaction: Interaction,
         team: Role,
         capacity: app_commands.Choice[int],
-        series: List[app_commands.Choice[str]],
+        series: app_commands.Choice[str],
         game_mode: app_commands.Choice[str]
     ):
         """"""
