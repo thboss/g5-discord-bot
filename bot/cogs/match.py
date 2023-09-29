@@ -589,52 +589,27 @@ class MatchCog(commands.Cog, name="Match"):
         map_method: str='veto',
         captain_method: str='rank',
         series: str='bo1',
-        region: str='',
-        team1_model: TeamModel=None,
-        team2_model: TeamModel=None,
-        season_id: int=None,
     ):
         """"""
-        is_pug = len(queue_users) > 0
-        team1_id = None
-        team2_id = None
         await asyncio.sleep(3)
         try:
-            if not is_pug: # official match
-                team1_captain = team1_model.captain
-                team2_captain = team2_model.captain
-                team1_name = team1_model.name
-                team2_name = team2_model.name
-                team1_id = team1_model.id
-                team2_id = team2_model.id
-                team1_users = await db.get_team_users(team1_id, guild)
-                team2_users = await db.get_team_users(team2_id, guild)
-            else: # pug match
-                if team_method == 'captains' and len(queue_users) >= 4:
-                    team1_users, team2_users = await self.pick_teams(message, queue_users, captain_method)
-                elif team_method == 'autobalance' and len(queue_users) >= 4:
-                    team1_users, team2_users = await self.autobalance_teams(queue_users)
-                else:  # team_method is random
-                    team1_users, team2_users = self.randomize_teams(queue_users)
-                
-                team1_users_model = await db.get_users(team1_users)
-                team2_users_model = await db.get_users(team2_users)
-                team1_captain = team1_users[0]
-                team2_captain = team2_users[0]
-                team1_name = team1_captain.display_name
-                team2_name = team2_captain.display_name
-                dict_team1_users = { user_model.steam: {
-                    'name': user_model.user.display_name,
-                    'captain': user_model.user == team1_captain,
-                    'coach': False,
-                } for user_model in team1_users_model}
-                dict_team2_users = { user_model.steam: {
-                    'name': user_model.user.display_name,
-                    'captain': user_model.user == team2_captain,
-                    'coach': False,
-                } for user_model in team2_users_model}
-                team1_id = await api.create_team(team1_name, dict_team1_users)
-                team2_id = await api.create_team(team2_name, dict_team2_users)
+            if team_method == 'captains' and len(queue_users) >= 4:
+                team1_users, team2_users = await self.pick_teams(message, queue_users, captain_method)
+            elif team_method == 'autobalance' and len(queue_users) >= 4:
+                team1_users, team2_users = await self.autobalance_teams(queue_users)
+            else:  # team_method is random
+                team1_users, team2_users = self.randomize_teams(queue_users)
+            
+            team1_users_model = await db.get_users(team1_users)
+            team2_users_model = await db.get_users(team2_users)
+            team1_captain = team1_users[0]
+            team2_captain = team2_users[0]
+            team1_name = team1_captain.display_name
+            team2_name = team2_captain.display_name
+            match_players = [ {
+                'steam_id_64': u.steam,
+                'team': 'team1' if u in team1_users_model else 'team2'
+            } for u in team1_users_model + team2_users_model]
 
             if map_method == 'veto':
                 veto_view = VetoView(message, mpool, series, team1_captain, team2_captain, game_mode)
@@ -644,37 +619,30 @@ class MatchCog(commands.Cog, name="Match"):
             else:
                 maps_list = sample(mpool, int(series[2]))
 
-            str_maps = ' '.join(m for m in maps_list)
-
             await message.edit(embed=Embed(description='Searching for available game servers...'), view=None)
             await asyncio.sleep(2)
 
-            match_server = await self.find_match_server(region)
+            game_server = await self.find_match_server()
 
             await message.edit(embed=Embed(description='Setting up match on game server...'), view=None)
             await asyncio.sleep(2)
 
-            dict_spectators = {}
             spectators = await db.get_spectators(guild)
             for spec in spectators:
                 if spec.user not in team1_users and spec.user not in team2_users:
-                    dict_spectators[spec.steam] = spec.user.display_name
+                    match_players.append({'steam_id_64': spec.steam, 'team': 'spectator'})
 
-            match_id = await api.create_match(
-                match_server.id,
-                team1_id,
-                team2_id,
-                str_maps,
-                len(team1_users + team2_users),
-                game_mode,
-                is_pug,
-                dict_spectators,
-                season_id
+            api_match = await api.create_match(
+                game_server.id,
+                maps_list[0],
+                team1_name,
+                team2_name,
+                match_players
             )
 
             await message.edit(embed=Embed(description='Setting up teams channels...'), view=None)
             category, team1_channel, team2_channel = await self.create_match_channels(
-                match_id,
+                api_match.id,
                 team1_name,
                 team2_name,
                 team1_users,
@@ -683,9 +651,7 @@ class MatchCog(commands.Cog, name="Match"):
             )
 
             await db.insert_match({
-                'id': match_id,
-                'team1_id': team1_id,
-                'team2_id': team2_id,
+                'id': api_match.id,
                 'guild': guild.id,
                 'channel': message.channel.id,
                 'message': message.id,
@@ -694,9 +660,8 @@ class MatchCog(commands.Cog, name="Match"):
                 'team2_channel': team2_channel.id
             })
 
-            match_stats = await api.get_match(match_id)
-            await db.insert_match_users(match_id, team1_users + team2_users)
-            embed = self.embed_match_info(match_stats, match_server)
+            await db.insert_match_users(api_match.id, team1_users + team2_users)
+            embed = self.embed_match_info(api_match, game_server)
 
         except APIError as e:
             description = e.message
@@ -718,20 +683,6 @@ class MatchCog(commands.Cog, name="Match"):
 
             return True
 
-        # Delete the created teams from api if setup didn't complete
-        if is_pug:
-            if team1_id:
-                try:
-                    await api.delete_team(team1_id)
-                except Exception as e:
-                    self.bot.logger.warning(str(e))
-
-            if team2_id:
-                try:
-                    await api.delete_team(team2_id)
-                except Exception as e:
-                    self.bot.logger.warning(str(e))
-
         embed = Embed(title="Match Setup Failed",
                       description=description, color=0xE02B2B)
         try:
@@ -739,24 +690,14 @@ class MatchCog(commands.Cog, name="Match"):
         except Exception as e:
             pass
 
-    async def find_match_server(self, region=None):
+    async def find_match_server(self):
         """"""
-        servers = await api.get_servers()
+        game_servers = await api.get_game_servers()
 
-        for server in servers:
-            if server.in_use:
+        for game_server in game_servers:
+            if not game_server.on:
                 continue
-
-            if region and server.flag != region:
-                continue
-
-            try:
-                is_available = await api.is_server_available(server.id)
-                if is_available:
-                    return server
-            except Exception as e:
-                self.bot.log_exception('API ERROR: ', e)
-                continue
+            return game_server
 
         raise ValueError("No game server available.")
 
