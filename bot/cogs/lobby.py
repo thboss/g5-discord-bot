@@ -1,7 +1,7 @@
 # lobby.py
 
 from asyncpg.exceptions import UniqueViolationError
-from typing import List, Optional
+from typing import List
 from collections import defaultdict
 import asyncio
 
@@ -9,12 +9,10 @@ from discord.ext import commands
 from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPException, SelectOption
 
 from bot.helpers.db import db
-from bot.helpers.api import api
 from bot.helpers.models import LobbyModel
 from bot.helpers.errors import CustomError, JoinLobbyError
 from bot.views import ReadyView, DropDownView
 from bot.bot import G5Bot
-from bot.helpers.utils import COUNTRY_FLAGS
 from bot.helpers.configs import Config
 
 
@@ -29,13 +27,11 @@ CAPACITY_CHOICES = [
 
 TEAM_SELECTION_CHOICES = [
     app_commands.Choice(name="Random", value="random"),
-    app_commands.Choice(name="Auto balance", value="autobalance"),
     app_commands.Choice(name="Captains", value="captains"),
 ]
 
 CAPTAIN_SELECTION_CHOICES = [
     app_commands.Choice(name="Random", value="random"),
-    app_commands.Choice(name="Rank", value="rank"),
     app_commands.Choice(name="Volunteer", value="volunteer"),
 ]
 
@@ -44,20 +40,9 @@ MAP_SELECTION_CHOICES = [
     app_commands.Choice(name="Veto", value="veto"),
 ]
 
-AUTO_READY_CHOICES = [
-    app_commands.Choice(name="ON", value=True),
-    app_commands.Choice(name="OFF", value=False)
-]
-
-SERIES_CHOICES = [
-    app_commands.Choice(name="Bo1", value="bo1"),
-    app_commands.Choice(name="Bo2", value="bo2"),
-    app_commands.Choice(name="Bo3", value="bo3")
-]
-
 GAME_MODE_CHOICES = [
     app_commands.Choice(name="Competitive", value="competitive"),
-    app_commands.Choice(name="Wingman", value="wingman")
+    app_commands.Choice(name="Wingman", value="wingman"),
 ]
 
 
@@ -77,43 +62,27 @@ class LobbyCog(commands.Cog, name="Lobby"):
         capacity="Capacity of the lobby",
         teams_method="Teams selection method",
         captains_method="Captains selection method",
-        map_method="Map selection method",
-        series="Number of maps per match",
-        game_mode="Set game mode",
-        region="Game server location where the match must setup. e.g. US"
+        map_method="Map selection method"
     )
     @app_commands.choices(
         capacity=CAPACITY_CHOICES,
         teams_method=TEAM_SELECTION_CHOICES,
         captains_method=CAPTAIN_SELECTION_CHOICES,
         map_method=MAP_SELECTION_CHOICES,
-        series=SERIES_CHOICES,
-        game_mode=GAME_MODE_CHOICES,
-        auto_ready=AUTO_READY_CHOICES
+        game_mode=GAME_MODE_CHOICES
     )
     @app_commands.checks.has_permissions(administrator=True)
     async def create_lobby(
         self,
         interaction: Interaction,
         capacity: app_commands.Choice[int],
+        game_mode: app_commands.Choice[str],
         teams_method: app_commands.Choice[str],
         captains_method: app_commands.Choice[str],
         map_method: app_commands.Choice[str],
-        series: app_commands.Choice[str],
-        game_mode: app_commands.Choice[str],
-        auto_ready: app_commands.Choice[int],
-        season_id: Optional[int],
-        region: Optional[str],
     ):
         """ Create a new lobby. """
         await interaction.response.defer(ephemeral=True)
-        if region and region.upper() not in COUNTRY_FLAGS:
-            raise CustomError("Invalid region code")
-        
-        if season_id:
-            season = await api.get_season(season_id)
-            if not season:
-                raise CustomError("Invalid season ID")
 
         guild = interaction.guild
         guild_model = await db.get_guild_by_id(guild.id, self.bot)
@@ -136,24 +105,18 @@ class LobbyCog(commands.Cog, name="Lobby"):
             'team_method': teams_method.value,
             'captain_method': captains_method.value,
             'map_method': map_method.value,
-            'autoready': auto_ready.value,
-            'series_type': series.value,
-            'game_mode': game_mode.value,
             'category': category.id,
             'queue_channel': text_channel.id,
-            'lobby_channel': voice_channel.id
+            'lobby_channel': voice_channel.id,
+            'game_mode': game_mode.value
         }
-        if region:
-            lobby_data['region'] = region.upper()
-        if season_id:
-            lobby_data['season_id'] = season_id
 
         lobby_id = await db.insert_lobby(lobby_data)
 
         await category.edit(name=f"Lobby #{lobby_id}")
 
-        all_maps = list(Config.maps[game_mode.value].keys())
-        await db.insert_lobby_maps(lobby_id, all_maps[:7])
+        all_maps = list(Config.maps.keys())
+        await db.insert_lobby_maps(lobby_id, all_maps[:23])
 
         lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
         await self.update_queue_msg(lobby_model)
@@ -248,7 +211,6 @@ class LobbyCog(commands.Cog, name="Lobby"):
         if not lobby_model or lobby_model.guild.id != guild.id:
             raise CustomError("Invalid Lobby ID")
 
-        all_maps = Config.maps[lobby_model.game_mode]
         lobby_maps = await db.get_lobby_maps(lobby_id)
     
         placeholder = "Select maps from the list"
@@ -257,10 +219,10 @@ class LobbyCog(commands.Cog, name="Lobby"):
                 label=display_name,
                 value=map_name,
                 default=map_name in lobby_maps
-            ) for map_name, display_name in all_maps.items()
+            ) for map_name, display_name in Config.maps.items()
         ]
-        max_maps = len(all_maps) if lobby_model.series == "bo1" else 7
-        dropdown = DropDownView(user, placeholder, options, 7, max_maps)
+
+        dropdown = DropDownView(user, placeholder, options, 7, len(options))
         message = await interaction.followup.send(view=dropdown, wait=True)
         await dropdown.wait()
 
@@ -269,11 +231,11 @@ class LobbyCog(commands.Cog, name="Lobby"):
             await message.edit(embed=embed, view=None)
             return
         
-        active_maps = list(filter(lambda x: x in dropdown.selected_options, all_maps.keys()))
+        active_maps = list(filter(lambda x: x in dropdown.selected_options, Config.maps.keys()))
         await db.update_lobby_maps(lobby_id, active_maps, lobby_maps)
 
         embed.description = f"Map pool for lobby **#{lobby_id}** updated successfully."
-        embed.add_field(name="Active Maps", value='\n'.join(Config.maps[lobby_model.game_mode][m] for m in active_maps))
+        embed.add_field(name="Active Maps", value='\n'.join(Config.maps[m] for m in active_maps))
         await message.edit(embed=embed, view=None)
 
     @app_commands.command(name="add-spectator", description="Add a user to the matches")
@@ -378,11 +340,10 @@ class LobbyCog(commands.Cog, name="Lobby"):
                     pass
 
                 unreadied_users = []
-                if not lobby_model.auto_ready:
-                    ready_view = ReadyView(queued_users, lobby_model.text_channel)
-                    await ready_view.start()
-                    await ready_view.wait()
-                    unreadied_users = set(queued_users) - ready_view.ready_users
+                ready_view = ReadyView(queued_users, lobby_model.text_channel)
+                await ready_view.start()
+                await ready_view.wait()
+                unreadied_users = set(queued_users) - ready_view.ready_users
 
                 if unreadied_users:
                     awaitables = [u.move_to(guild_model.prematch_channel) for u in unreadied_users]
@@ -399,13 +360,10 @@ class LobbyCog(commands.Cog, name="Lobby"):
                         setup_match_msg,
                         map_pool,
                         queue_users=queued_users,
-                        game_mode=lobby_model.game_mode,
                         team_method=lobby_model.team_method,
                         captain_method=lobby_model.captain_method,
                         map_method=lobby_model.map_method,
-                        series=lobby_model.series,
-                        region=lobby_model.region,
-                        season_id=lobby_model.season_id
+                        game_mode=lobby_model.game_mode
                     )
                     if not match_started:
                         awaitables = [u.move_to(guild_model.prematch_channel) for u in queued_users]
@@ -434,7 +392,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         except UniqueViolationError:
             raise JoinLobbyError(user, "Please try again")
 
-    async def update_queue_msg(self, lobby_model: LobbyModel, title: str = None):
+    async def update_queue_msg(self, lobby_model: LobbyModel, title: str=None):
         """"""
         if not lobby_model.text_channel or not lobby_model.voice_channel:
             return
@@ -446,7 +404,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
             queue_message = await lobby_model.text_channel.fetch_message(lobby_model.message_id)
         except:
             queue_message = await lobby_model.text_channel.send(embed=Embed(description="New Queue Message"))
-            await db.update_lobby_data(lobby_model.id, {'last_message': queue_message.id})
+            await db.update_lobby(lobby_model.id, {'last_message': queue_message.id})
 
         embed = self._embed_queue(
             title, lobby_model, queued_users)
@@ -459,9 +417,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         info_str = f"Game mode: *{lobby_model.game_mode.capitalize()}*\n" \
                    f"Teams method: *{lobby_model.team_method.capitalize()}*\n" \
                    f"Captains method: *{lobby_model.captain_method.capitalize()}*\n" \
-                   f"Maps method: *{lobby_model.map_method.capitalize()}*\n" \
-                   f"Series: *{lobby_model.series.capitalize()}*\n" \
-                   f"Auto-ready: *{'ON' if lobby_model.auto_ready else 'OFF'}*"
+                   f"Maps method: *{lobby_model.map_method.capitalize()}*"
 
         queued_players_str = "*Lobby is empty*" if not queued_users else ""
         for num, user in enumerate(queued_users, start=1):

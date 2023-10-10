@@ -7,7 +7,7 @@ from typing import List, Union, Optional
 import discord
 
 from bot.helpers.configs import Config
-from bot.helpers.models import LobbyModel, MatchModel, GuildModel, UserModel, TeamModel
+from bot.helpers.models import LobbyModel, MatchModel, GuildModel, UserModel
 
 
 class DBManager:
@@ -84,15 +84,17 @@ class DBManager:
     async def insert_match(self, data: dict) -> None:
         """"""
         cols = ", ".join(col for col in data)
-        vals = ", ".join(str(val) for val in data.values())
+        vals = ", ".join(f"'{val}'" if type(val) is
+                         str else str(val) for val in data.values())
         sql = f"INSERT INTO matches ({cols})\n" \
             f"    VALUES({vals});"
+
         await self.query(sql)
 
     async def insert_match_users(self, match_id: int, users: List[discord.Member]) -> None:
         """"""
         values = f", ".join(
-            f"({match_id}, {user.id})" for user in users)
+            f"('{match_id}', {user.id})" for user in users)
         sql = f"INSERT INTO match_users VALUES {values};"
         await self.query(sql)
 
@@ -229,7 +231,7 @@ class DBManager:
         lobby = await self.query(sql)
         return list(map(lambda r: r['id'], lobby))[0]
 
-    async def update_lobby_data(self, lobby_id: int, data: dict) -> None:
+    async def update_lobby(self, lobby_id: int, data: dict) -> None:
         """"""
         col_vals = ",\n    ".join(
             f"{key} = {val}" for key, val in data.items())
@@ -324,94 +326,6 @@ class DBManager:
             f'    SET {col_vals}\n' \
             f'    WHERE id = $1;'
         await self.query(sql, guild_id)
-
-    async def get_team_by_id(self, team_id: int, bot) -> Union["TeamModel", None]:
-        """"""
-        sql = "SELECT * FROM teams WHERE id = $1;"
-        data = await self.query(sql, team_id)
-        if data:
-            guild = bot.get_guild(data[0]['guild'])
-            if guild:
-                return TeamModel.from_dict(data[0], guild)
-            
-    async def get_team_by_role(self, role: discord.Role, bot) -> Union["TeamModel", None]:
-        """"""
-        sql = "SELECT * FROM teams WHERE role = $1;"
-        data = await self.query(sql, role.id)
-        if data:
-            guild = bot.get_guild(data[0]['guild'])
-            if guild:
-                return TeamModel.from_dict(data[0], guild)
-            
-    async def get_guild_teams(self, guild: discord.Guild):
-        """"""
-        sql = "SELECT * FROM teams WHERE guild = $1;"
-        data = await self.query(sql, guild.id)
-        return [TeamModel.from_dict(team_data, guild) for team_data in data]
-    
-    async def insert_team(self, data: dict) -> None:
-        """"""
-        cols = ", ".join(col for col in data)
-        vals = ", ".join(str(val) for val in data.values())
-        sql = f"INSERT INTO teams ({cols})\n" \
-            f"    VALUES({vals});"
-        await self.query(sql)
-
-    async def update_team(self, team_id: int, **kwargs) -> None:
-        """"""
-        sql = "UPDATE teams SET $2 WHERE id = $1;"
-        await self.query(sql, team_id, **kwargs)
-
-    async def insert_team_users(self, team_id: int, users: List[discord.Member]) -> None:
-        """"""
-        values = f", ".join(
-            f"({team_id}, {user.id})" for user in users)
-        sql = f"INSERT INTO team_users VALUES {values};"
-        await self.query(sql)
-
-    async def delete_team_users(self, team_id: int, users: List[discord.Member]) -> List[dict]:
-        """"""
-        sql = "DELETE FROM team_users\n" \
-            f"    WHERE team_id = $1 AND user_id::BIGINT = ANY(ARRAY{[u.id for u in users]}::BIGINT[])\n" \
-            "    RETURNING user_id;"
-        return await self.query(sql, team_id)
-    
-    async def get_user_team(self, user_id: int, guild: discord.Guild) -> Optional[TeamModel]:
-        """"""
-        sql = "SELECT t.* FROM teams t\n" \
-            "JOIN team_users tu\n" \
-            "    ON tu.team_id = t.id AND t.guild = $1\n" \
-            "WHERE tu.user_id = $2;"
-        data = await self.query(sql, guild.id, user_id)
-        if data:
-            return TeamModel.from_dict(data[0], guild)
-        
-    async def get_team_users(self, team_id: int, guild: discord.Guild) -> List[discord.Member]:
-        """"""
-        sql = "SELECT user_id FROM team_users tu\n" \
-            "JOIN teams t\n" \
-            "    ON tu.team_id = t.id AND t.guild = $1\n" \
-            "WHERE tu.team_id = $2;"
-        data = await self.query(sql, guild.id, team_id)
-        users_ids = list(map(lambda r: r['user_id'], data))
-        team_users = []
-        for uid in users_ids:
-            user = guild.get_member(uid)
-            if user:
-                team_users.append(user)
-        return team_users
-    
-    async def delete_team(self, team_id: int, guild: discord.Guild):
-        """"""
-        sql = "DELETE FROM teams WHERE id = $1 AND guild = $2;"
-        await self.query(sql, team_id, guild.id)
-
-    async def get_team_match(self, team_id: int, guild: discord.Guild):
-        """"""
-        sql = "SELECT * FROM matches WHERE team1_id = $1 OR team2_id = $1 AND guild = $2;"
-        data = await self.query(sql, team_id, guild.id)
-        if data:
-            return MatchModel.from_dict(data[0], guild)
         
     async def get_spectators(self, guild: discord.Guild) -> List[UserModel]:
         """"""
@@ -435,4 +349,37 @@ class DBManager:
              f"    WHERE user_id::BIGINT = ANY(ARRAY{[u.id for u in users]}::BIGINT[]) AND guild_id = $1\n" \
               "RETURNING user_id;"
         return await self.query(sql, guild.id)
+    
+    async def is_server_in_use(self, game_server_id: str):
+        """"""
+        sql = "SELECT id FROM matches WHERE game_server_id = $1;"
+        return await self.query(sql, game_server_id)
+    
+    async def update_user_stats(self, user_id: int, stats: dict):
+        """"""
+
+        sql = "SELECT * FROM user_stats WHERE user_id = $1;"
+        existing_stats = await self.query(sql, user_id)
+
+        if existing_stats:
+            stats['kills'] = existing_stats[0].kills + stats['kills']
+            stats['deaths'] = existing_stats[0].deaths + stats['deaths']
+            stats['assists'] = existing_stats[0].assists + stats['assists']
+            stats['wins'] = existing_stats[0].wins + stats['wins']
+            stats['played_matches'] = existing_stats[0].played_matches + 1
+            stats['elo'] = existing_stats[0].elo + stats['elo']
+
+            col_vals = ",\n    ".join(
+                f"{key} = {val}" for key, val in stats.items())
+
+            sql = f'UPDATE users SET {col_vals} WHERE user_id = $1;'
+            await self.query(sql, user_id)
+        else:
+            cols = ", ".join(col for col in stats)
+            vals = ", ".join(str(val) for val in stats.values())
+
+            sql = f"INSERT INTO user_stats ({cols}) VALUES({vals});"
+            await self.query(sql)
+
+
 db = DBManager()

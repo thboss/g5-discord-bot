@@ -64,11 +64,6 @@ class LinkCog(commands.Cog, name='Link'):
         if user_match:
             raise CustomError(
                 f"You can't unlink your account while you are in match #{user_match.id}")
-
-        user_team = await db.get_user_team(user.id, interaction.guild)
-        if user_team:
-            raise CustomError(
-                f"You can't unlink your account while you are in team #{user_team.id}")
         
         spectators = await db.get_spectators(interaction.guild)
         for spec in spectators:

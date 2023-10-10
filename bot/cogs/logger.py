@@ -90,7 +90,7 @@ LOGGING_CONFIG = {
             'level': 'DEBUG' if Config.debug else 'INFO',
         },
         'discord': {
-            'level': 'DEBUG' if Config.debug else 'INFO',
+            'level': 'INFO',
         }
     },
     'root': {

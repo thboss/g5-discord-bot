@@ -6,29 +6,18 @@
     "sync_commands_globally": true,
     "debug": false,
     "maps": {
-      "competitive": {
-        "de_dust2": "Dust II",
-        "de_inferno": "Inferno",
-        "de_vertigo": "Vertigo",
-        "de_overpass": "Overpass",
-        "de_mirage": "Mirage",
-        "de_nuke": "Nuke",
-        "de_ancient": "Ancient"
-      },
-      "wingman": {
-        "de_boyard": "Boyard",
-        "de_chalice": "Chalice",
-        "de_cobblestone": "Cobblestone",
-        "de_shortdust": "Shortdust",
-        "de_shortnuke": "Shortnuke",
-        "de_train": "Train",
-        "de_vertigo": "Vertigo"
-      }
+      "de_dust2": "Dust II",
+      "de_inferno": "Inferno",
+      "de_vertigo": "Vertigo",
+      "de_overpass": "Overpass",
+      "de_mirage": "Mirage",
+      "de_nuke": "Nuke",
+      "de_ancient": "Ancient"
     }
   },
-  "web": {
-    "base_url": "",
-    "api_key": ""
+  "dathost": {
+    "email": "",
+    "password": ""
   },
   "db": {
     "user": "g5",

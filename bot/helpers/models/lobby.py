@@ -19,11 +19,7 @@ class LobbyModel:
         team_method: Literal["autobalance", "captains", "random"],
         captain_method: Literal["random", "volunteer", "rank"],
         map_method: Literal["random", "veto"],
-        series: Literal["bo1", "bo2", "bo3"],
-        game_mode: Literal["competitive", "wingman"],
-        auto_ready: bool,
-        season_id: Optional[int],
-        region: Optional[str]
+        game_mode: Literal["competitive", "wingman"]
     ):
         """"""
         self.id = lobby_id
@@ -36,11 +32,7 @@ class LobbyModel:
         self.team_method = team_method
         self.captain_method = captain_method
         self.map_method = map_method
-        self.series = series
         self.game_mode = game_mode
-        self.auto_ready = auto_ready
-        self.season_id =  season_id
-        self.region = region
 
     @classmethod
     def from_dict(cls, data: dict, guild: discord.Guild) -> "LobbyModel":
@@ -56,9 +48,5 @@ class LobbyModel:
             data['team_method'],
             data['captain_method'],
             data['map_method'],
-            data['series_type'],
             data['game_mode'],
-            data['autoready'],
-            data['season_id'],
-            data['region']
         )

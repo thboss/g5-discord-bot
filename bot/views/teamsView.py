@@ -122,23 +122,6 @@ class PickTeamsView(View):
         return embed
 
     async def start(self, captain_method: str):
-        if captain_method == 'rank':
-            try:
-                leaderboard = await api.get_leaderboard(self.users)
-            except Exception as e:
-                captain_method = 'random'
-            else:
-                stats_dict = dict(zip(leaderboard, self.users))
-                players_stats = list(stats_dict.keys())
-                players_stats.sort(key=lambda x: x.rating)
-
-                for team in self.teams:
-                    player_stat = players_stats.pop()
-                    captain = stats_dict.get(player_stat)
-                    self.users_left.remove(captain)
-                    team.append(captain)
-                    self._remove_captain_button(captain)
-
         if captain_method == 'random':
             temp_users = self.users_left.copy()
             shuffle(temp_users)

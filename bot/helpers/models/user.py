@@ -9,20 +9,17 @@ class UserModel:
 
     def __init__(
         self,
-        user: Optional[discord.Member],
-        steam: Optional[str],
-        flag: Optional[str]
+        member: Optional[discord.Member],
+        steam: Optional[str]
     ):
         """"""
-        self.user = user
+        self.member = member
         self.steam = steam
-        self.flag = flag
 
     @classmethod
-    def from_dict(cls, data: dict, user: discord.Member) -> "UserModel":
+    def from_dict(cls, data: dict, member: discord.Member) -> "UserModel":
         """"""
         return cls(
-            user,
-            data['steam_id'],
-            data['flag']
+            member,
+            data['steam_id']
         )

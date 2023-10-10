@@ -8,20 +8,16 @@ __depends__ = {}
 
 steps = [
     step(
-        'CREATE TYPE team_method AS ENUM(\'captains\', \'autobalance\', \'random\');',
+        'CREATE TYPE team_method AS ENUM(\'captains\', \'random\');',
         'DROP TYPE team_method;'
     ),
     step(
-        'CREATE TYPE captain_method AS ENUM(\'volunteer\', \'rank\', \'random\');',
+        'CREATE TYPE captain_method AS ENUM(\'volunteer\', \'random\');',
         'DROP TYPE captain_method;'
     ),
     step(
         'CREATE TYPE map_method AS ENUM(\'veto\', \'random\');',
         'DROP TYPE map_method;'
-    ),
-    step(
-        'CREATE TYPE series_type AS ENUM(\'bo1\', \'bo2\', \'bo3\');',
-        'DROP TYPE series_type;'
     ),
     step(
         'CREATE TYPE game_mode AS ENUM(\'competitive\', \'wingman\');',
@@ -44,17 +40,15 @@ steps = [
             'CREATE TABLE lobbies(\n'
             '    id SERIAL PRIMARY KEY,\n'
             '    guild BIGINT DEFAULT NULL REFERENCES guilds (id) ON DELETE CASCADE,\n'
-            '    series_type series_type DEFAULT \'bo1\',\n'
             '    team_method team_method DEFAULT \'captains\',\n'
             '    map_method map_method DEFAULT \'veto\',\n'
             '    captain_method captain_method DEFAULT \'volunteer\',\n'
-            '    game_mode game_mode DEFAULT \'competitive\',\n'
             '    capacity SMALLINT DEFAULT 10,\n'
             '    category BIGINT DEFAULT NULL,\n'
             '    queue_channel BIGINT DEFAULT NULL,\n'
             '    lobby_channel BIGINT DEFAULT NULL,\n'
             '    last_message BIGINT DEFAULT NULL,\n'
-            '    autoready BOOL DEFAULT FALSE\n'
+            '    game_mode game_mode DEFAULT \'competitive\'\n'
             ');'
         ),
         'DROP TABLE lobbies;'
@@ -62,25 +56,23 @@ steps = [
     step(
         (
             'CREATE TABLE matches(\n'
-            '    id INTEGER PRIMARY KEY,\n'
+            '    id VARCHAR(64) PRIMARY KEY,\n'
+            '    game_server_id VARCHAR(64) DEFAULT NULL,\n'
             '    guild BIGINT DEFAULT NULL REFERENCES guilds (id) ON DELETE CASCADE,\n'
+            '    channel BIGINT DEFAULT NULL,\n'
             '    message BIGINT DEFAULT NULL,\n'
             '    category BIGINT DEFAULT NULL,\n'
-            '    lobby INTEGER DEFAULT NULL,\n'
             '    team1_channel BIGINT DEFAULT NULL,\n'
-            '    team2_channel BIGINT DEFAULT NULL,\n'
-            '    team1_id INTEGER DEFAULT NULL,\n'
-            '    team2_id INTEGER DEFAULT NULL\n'
+            '    team2_channel BIGINT DEFAULT NULL\n'
             ');'
         ),
         'DROP TABLE matches;'
     ),
     step(
         (
-            'CREATE TABLE users('
+            'CREATE TABLE users(\n'
             '    discord_id BIGSERIAL UNIQUE,\n'
-            '    steam_id VARCHAR(18) UNIQUE,\n'
-            '    flag VARCHAR(3) DEFAULT NULL\n'
+            '    steam_id VARCHAR(18) UNIQUE\n'
             ');'
         ),
         'DROP TABLE users;'
@@ -98,7 +90,7 @@ steps = [
     step(
         (
             'CREATE TABLE match_users(\n'
-            '    match_id INTEGER REFERENCES matches (id) ON DELETE CASCADE,\n'
+            '    match_id VARCHAR(64) REFERENCES matches (id) ON DELETE CASCADE,\n'
             '    user_id BIGINT REFERENCES users (discord_id),\n'
             '    CONSTRAINT match_user_pkey PRIMARY KEY (match_id, user_id)\n'
             ');'
@@ -114,5 +106,15 @@ steps = [
             ');'
         ),
         'DROP TABLE lobby_maps;'
+    ),
+    step(
+        (
+            'CREATE TABLE spectators(\n'
+            '    guild_id BIGINT REFERENCES guilds (id) ON DELETE CASCADE,\n'
+            '    user_id BIGINT REFERENCES users (discord_id) ON DELETE CASCADE,\n'
+            '    CONSTRAINT spectator_pkey PRIMARY KEY (guild_id, user_id)\n'
+            ');'
+        ),
+        'DROP TABLE spectators;'
     )
 ]
