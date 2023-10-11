@@ -31,7 +31,7 @@ class MatchCog(commands.Cog, name="Match"):
 
         guild_model = await db.get_guild_by_id(interaction.guild.id, self.bot)
         match_model = await db.get_match_by_id(match_id, self.bot)
-        match_players = await db.get_match_users(api_match.id, match_model.guild)
+        match_players = await db.get_match_users(match_id, match_model.guild)
         if not match_model:
             raise CustomError("Invalid match ID.")
         
@@ -101,9 +101,10 @@ class MatchCog(commands.Cog, name="Match"):
         description = ''
 
         if game_server:
-            description += f'📌 Server: `connect {game_server.ip}:{game_server.port}`\n' \
+            description += f'📌 **Server:** `connect {game_server.ip}:{game_server.port}`\n' \
+                           f'⚙️ **Game mode:** {game_server.game_mode}\n'
 
-        description += f'🗺️ Map: {match_stats.map}\n\n'
+        description += f'🗺️ **Map:** {match_stats.map}\n\n'
         embed = Embed(title=title, description=description)
 
         is_live = not match_stats.finished and not match_stats.cancel_reason
@@ -183,10 +184,11 @@ class MatchCog(commands.Cog, name="Match"):
                 match_players
             )
 
-            cmd = f"exec gamemode_competitive"
-            if game_mode == "wingman":
-                cmd += "2v2"
-            await api.send_rcon_to_game_server(game_server.id, cmd)
+            # cmd = f"exec gamemode_competitive"
+            # if game_mode == "wingman":
+            #     cmd += "2v2"
+            # await api.send_rcon_to_game_server(game_server.id, cmd)
+            await api.update_game_server_mode(game_server.id, game_mode)
 
             await message.edit(embed=Embed(description='Setting up teams channels...'), view=None)
             category, team1_channel, team2_channel = await self.create_match_channels(
@@ -312,16 +314,19 @@ class MatchCog(commands.Cog, name="Match"):
 
     async def finalize_match(self, match_model: MatchModel, guild_model: GuildModel):
         """"""
+        await db.delete_match(match_model.id)
+
         match_players = await db.get_match_users(match_model.id, match_model.guild)
         move_aws = [user.move_to(guild_model.prematch_channel) for user in match_players]
-        delete_aws = [
-            match_model.team1_channel.delete(),
-            match_model.team2_channel.delete(),
-            match_model.category.delete(),
-            db.delete_match(match_model.id)
-        ]
+        
+        try:
+            await match_model.team1_channel.delete()
+            await match_model.team2_channel.delete()
+            await match_model.category.delete()
+        except:
+            pass
+
         await asyncio.gather(*move_aws, return_exceptions=True)
-        await asyncio.gather(*delete_aws, return_exceptions=True)
 
     async def update_match_stats(self, match_model: MatchModel):
         """"""

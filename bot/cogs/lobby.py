@@ -415,9 +415,9 @@ class LobbyCog(commands.Cog, name="Lobby"):
         embed = Embed(title=title)
 
         info_str = f"Game mode: *{lobby_model.game_mode.capitalize()}*\n" \
-                   f"Teams method: *{lobby_model.team_method.capitalize()}*\n" \
-                   f"Captains method: *{lobby_model.captain_method.capitalize()}*\n" \
-                   f"Maps method: *{lobby_model.map_method.capitalize()}*"
+                   f"Teams selection: *{lobby_model.team_method.capitalize()}*\n" \
+                   f"Captains selection: *{lobby_model.captain_method.capitalize()}*\n" \
+                   f"Maps selection: *{lobby_model.map_method.capitalize()}*"
 
         queued_players_str = "*Lobby is empty*" if not queued_users else ""
         for num, user in enumerate(queued_users, start=1):

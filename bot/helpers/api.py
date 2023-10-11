@@ -61,6 +61,7 @@ class GameServer:
         self.port = data['ports']['game']
         self.gotv_port = data['ports']['gotv']
         self.on = data['on']
+        self.game_mode = data['cs2_settings']['game_mode']
 
     @classmethod
     def from_dict(cls, data: dict) -> "GameServer":
@@ -165,6 +166,21 @@ class APIManager:
             self.logger.error(e, exc_info=1)
             raise APIError
         
+    async def update_game_server_mode(self, server_id: str, game_mode):
+        """"""
+        url = f"/api/0.1/game-servers/{server_id}"
+        payload = {
+            "cs2_settings.game_mode": game_mode
+        }
+
+        try:
+            async with self.session.put(url=url, data=payload) as resp:
+                await resp.json()
+                return resp.ok
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
+            raise APIError
+
     async def send_rcon_to_game_server(self, server_id: str, cmd: str):
         """"""
         url = f"/api/0.1/game-servers/{server_id}/console"
@@ -200,7 +216,7 @@ class APIManager:
         map_name: str,
         team1_name: str,
         team2_name: str,
-        players: List[dict],
+        players: List[dict]
     ) -> Match:
         """"""
 
