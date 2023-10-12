@@ -184,17 +184,11 @@ class MatchCog(commands.Cog, name="Match"):
                 match_players
             )
 
-            # cmd = f"exec gamemode_competitive"
-            # if game_mode == "wingman":
-            #     cmd += "2v2"
-            # await api.send_rcon_to_game_server(game_server.id, cmd)
-            await api.update_game_server_mode(game_server.id, game_mode)
+            await api.update_game_mode(game_server.id, game_mode)
 
             await message.edit(embed=Embed(description='Setting up teams channels...'), view=None)
             category, team1_channel, team2_channel = await self.create_match_channels(
                 api_match.id,
-                team1_name,
-                team2_name,
                 team1_users,
                 team2_users,
                 guild
@@ -259,49 +253,28 @@ class MatchCog(commands.Cog, name="Match"):
     async def create_match_channels(
         self,
         match_id: int,
-        team1_name: str,
-        team2_name: str,
         team1_users: List[Member],
         team2_users: List[Member],
         guild: Guild
     ):
         """"""
         match_catg = await guild.create_category_channel(f"Match #{match_id}")
-        team1_channel, team2_channel = None, None
         team1_overwrites = {u: PermissionOverwrite(connect=True) for u in team1_users}
         team1_overwrites[guild.default_role] = PermissionOverwrite(connect=False)
         team2_overwrites = {u: PermissionOverwrite(connect=True) for u in team2_users}
         team2_overwrites[guild.default_role] = PermissionOverwrite(connect=False)
 
-        try:
-            team1_channel = await guild.create_voice_channel(
-                name=f"Team {team1_name}",
-                category=match_catg,
-                overwrites=team1_overwrites
-            )
-        except HTTPException as e:
-            self.bot.logger.warning(e)
-            if e.code == 50035:
-                team1_channel = await guild.create_voice_channel(
-                    name=f"Team 1",
-                    category=match_catg,
-                    overwrites=team1_overwrites
-                )
-        
-        try:
-            team2_channel = await guild.create_voice_channel(
-                name=f"Team {team2_name}",
-                category=match_catg,
-                overwrites=team2_overwrites
-            )
-        except HTTPException as e:
-            self.bot.logger.warning(e)
-            if e.code == 50035:
-                team2_channel = await guild.create_voice_channel(
-                    name=f"Team 2",
-                    category=match_catg,
-                    overwrites=team2_overwrites
-                )
+        team1_channel = await guild.create_voice_channel(
+            name=f"Team 1",
+            category=match_catg,
+            overwrites=team1_overwrites
+        )
+    
+        team2_channel = await guild.create_voice_channel(
+            name=f"Team 2",
+            category=match_catg,
+            overwrites=team2_overwrites
+        )
 
         awaitables = []
         for user in team1_users:
@@ -317,7 +290,7 @@ class MatchCog(commands.Cog, name="Match"):
         await db.delete_match(match_model.id)
 
         match_players = await db.get_match_users(match_model.id, match_model.guild)
-        move_aws = [user.move_to(guild_model.prematch_channel) for user in match_players]
+        move_aws = [user.move_to(guild_model.waiting_channel) for user in match_players]
         
         try:
             await match_model.team1_channel.delete()

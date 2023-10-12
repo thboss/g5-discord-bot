@@ -187,7 +187,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         async with self.locks[lobby_model.id]:
             for user in lobby_model.voice_channel.members:
                 try:
-                    await user.move_to(guild_model.prematch_channel)
+                    await user.move_to(guild_model.waiting_channel)
                 except Exception as e:
                     pass
 
@@ -346,7 +346,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
                 unreadied_users = set(queued_users) - ready_view.ready_users
 
                 if unreadied_users:
-                    awaitables = [u.move_to(guild_model.prematch_channel) for u in unreadied_users]
+                    awaitables = [u.move_to(guild_model.waiting_channel) for u in unreadied_users]
                     awaitables.append(db.delete_lobby_users(lobby_model.id, unreadied_users))
                     await asyncio.gather(*awaitables, return_exceptions=True)
                 else:
@@ -366,7 +366,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
                         game_mode=lobby_model.game_mode
                     )
                     if not match_started:
-                        awaitables = [u.move_to(guild_model.prematch_channel) for u in queued_users]
+                        awaitables = [u.move_to(guild_model.waiting_channel) for u in queued_users]
                         await asyncio.gather(*awaitables, return_exceptions=True)
 
                     await db.clear_lobby_users(lobby_model.id)

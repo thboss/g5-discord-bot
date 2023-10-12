@@ -166,7 +166,7 @@ class APIManager:
             self.logger.error(e, exc_info=1)
             raise APIError
         
-    async def update_game_server_mode(self, server_id: str, game_mode):
+    async def update_game_mode(self, server_id: str, game_mode):
         """"""
         url = f"/api/0.1/game-servers/{server_id}"
         payload = {
@@ -224,8 +224,8 @@ class APIManager:
 
         payload = {
             'game_server_id': game_server_id,
-            'team1': { 'name': team1_name },
-            'team2': { 'name': team2_name },
+            'team1': { 'name': 'team_' + team1_name },
+            'team2': { 'name': 'team_' + team2_name },
             'players': players,
             'settings': {
                 'map': map_name,

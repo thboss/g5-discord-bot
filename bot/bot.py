@@ -141,16 +141,16 @@ class G5Bot(commands.AutoShardedBot):
         guild_model = await db.get_guild_by_id(guild.id, self)
         category = guild_model.category
         linked_role = guild_model.linked_role
-        prematch_channel = guild_model.prematch_channel
+        waiting_channel = guild_model.waiting_channel
         results_channel = guild_model.results_channel
 
-        if any(x is None for x in [category, linked_role, prematch_channel, results_channel]):
+        if any(x is None for x in [category, linked_role, waiting_channel, results_channel]):
             if not category:
                 category = await guild.create_category_channel('G5')
             if not linked_role:
                 linked_role = await guild.create_role(name='Linked')
-            if not prematch_channel:
-                prematch_channel = await guild.create_voice_channel(category=category, name='Pre-Match')
+            if not waiting_channel:
+                waiting_channel = await guild.create_voice_channel(category=category, name='Waiting Room')
             if not results_channel:
                 results_channel = await guild.create_text_channel(category=category, name='Results')
                 await results_channel.set_permissions(guild.self_role, send_messages=True)
@@ -159,7 +159,7 @@ class G5Bot(commands.AutoShardedBot):
             dict_data = {
                 'category': category.id,
                 'linked_role': linked_role.id,
-                'prematch_channel': prematch_channel.id,
+                'waiting_channel': waiting_channel.id,
                 'results_channel': results_channel.id
             }
             await db.update_guild_data(guild.id, dict_data)

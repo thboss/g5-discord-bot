@@ -28,7 +28,7 @@ steps = [
             'CREATE TABLE guilds(\n'
             '    id BIGSERIAL PRIMARY KEY,\n'
             '    linked_role BIGINT DEFAULT NULL,\n'
-            '    prematch_channel BIGINT DEFAULT NULL,\n'
+            '    waiting_channel BIGINT DEFAULT NULL,\n'
             '    category BIGINT DEFAULT NULL\n,'
             '    results_channel BIGINT DEFAULT NULL\n'
             ');'
