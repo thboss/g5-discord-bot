@@ -150,6 +150,7 @@ class MatchCog(commands.Cog, name="Match"):
             team2_captain = team2_users[0]
             team1_name = team1_captain.display_name
             team2_name = team2_captain.display_name
+
             match_players = [ {
                 'steam_id_64': u.steam,
                 'team': 'team1' if u in team1_users_model else 'team2'
