@@ -1,7 +1,6 @@
 # match.py
 
 from discord.ext import commands, tasks
-from discord.errors import HTTPException
 from discord import Embed, Member, Message, Guild, PermissionOverwrite, app_commands, Interaction
 from typing import List
 
@@ -87,9 +86,14 @@ class MatchCog(commands.Cog, name="Match"):
         team2_steam_ids = [player.steam_id for player in match_stats.team2_players]
         team1_users = list(filter(lambda u: u.steam in team1_steam_ids, match_players))
         team2_users = list(filter(lambda u: u.steam in team2_steam_ids, match_players))
-
-        embed.add_field(name="Team 1", value="\n".join(u.member.mention for u in team1_users))
-        embed.add_field(name="Team 2", value="\n".join(u.member.mention for u in team2_users))
+        
+        embed.add_field(name="Team 1", value="\n".join(
+            f'{u.member.mention} ([Steam](https://steamcommunity.com/profiles/{u.steam}/))' 
+            for u in team1_users), inline=False)
+        
+        embed.add_field(name="Team 2", value="\n".join(
+            f'{u.member.mention} ([Steam](https://steamcommunity.com/profiles/{u.steam}/))' 
+            for u in team2_users), inline=False)
 
     def embed_match_info(
         self,
@@ -261,8 +265,10 @@ class MatchCog(commands.Cog, name="Match"):
         """"""
         match_catg = await guild.create_category_channel(f"Match #{match_id}")
         team1_overwrites = {u: PermissionOverwrite(connect=True) for u in team1_users}
+        team1_overwrites[guild.self_role] = PermissionOverwrite(connect=True)
         team1_overwrites[guild.default_role] = PermissionOverwrite(connect=False)
         team2_overwrites = {u: PermissionOverwrite(connect=True) for u in team2_users}
+        team2_overwrites[guild.self_role] = PermissionOverwrite(connect=True)
         team2_overwrites[guild.default_role] = PermissionOverwrite(connect=False)
 
         team1_channel = await guild.create_voice_channel(
@@ -288,19 +294,19 @@ class MatchCog(commands.Cog, name="Match"):
 
     async def finalize_match(self, match_model: MatchModel, guild_model: GuildModel):
         """"""
-        await db.delete_match(match_model.id)
-
         match_players = await db.get_match_users(match_model.id, match_model.guild)
         move_aws = [user.move_to(guild_model.waiting_channel) for user in match_players]
+        await asyncio.gather(*move_aws, return_exceptions=True)
         
         try:
             await match_model.team1_channel.delete()
             await match_model.team2_channel.delete()
             await match_model.category.delete()
-        except:
+        except Exception as e:
+            self.bot.logger.error(e, exc_info=1)
             pass
 
-        await asyncio.gather(*move_aws, return_exceptions=True)
+        await db.delete_match(match_model.id)
 
     async def update_match_stats(self, match_model: MatchModel):
         """"""
@@ -353,6 +359,7 @@ class MatchCog(commands.Cog, name="Match"):
             self.add_teams_fields(embed, api_match, match_players)
             await guild_model.results_channel.send(embed=embed)
         except Exception as e:
+            self.bot.logger.error(e, exc_info=1)
             pass
 
         await self.finalize_match(match_model, guild_model)
