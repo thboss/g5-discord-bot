@@ -89,6 +89,10 @@ class G5Bot(commands.AutoShardedBot):
             if not match_cog.check_live_matches.is_running():
                 match_cog.check_live_matches.start()
 
+        stats_cog = self.get_cog('Stats')
+        if not stats_cog.update_leaderboard.is_running():
+            stats_cog.update_leaderboard.start()
+
         # Sync slash commands
         guild = self.get_guild(Config.guild_id)
         if guild:
@@ -143,23 +147,29 @@ class G5Bot(commands.AutoShardedBot):
         linked_role = guild_model.linked_role
         waiting_channel = guild_model.waiting_channel
         results_channel = guild_model.results_channel
+        leaderboard_channel = guild_model.leaderboard_channel
 
-        if any(x is None for x in [category, linked_role, waiting_channel, results_channel]):
+        if any(x is None for x in [category, linked_role, waiting_channel, results_channel, leaderboard_channel]):
             if not category:
                 category = await guild.create_category_channel('G5')
             if not linked_role:
                 linked_role = await guild.create_role(name='Linked')
             if not waiting_channel:
-                waiting_channel = await guild.create_voice_channel(category=category, name='Waiting Room')
+                waiting_channel = await category.create_voice_channel(name='Waiting Room')
             if not results_channel:
-                results_channel = await guild.create_text_channel(category=category, name='Results')
+                results_channel = await category.create_text_channel(name='Results')
                 await results_channel.set_permissions(guild.self_role, send_messages=True)
                 await results_channel.set_permissions(guild.default_role, send_messages=False)
+            if not leaderboard_channel:
+                leaderboard_channel = await category.create_text_channel(name='Leaderboard')
+                await leaderboard_channel.set_permissions(guild.self_role, send_messages=True)
+                await leaderboard_channel.set_permissions(guild.default_role, send_messages=False)
 
             dict_data = {
                 'category': category.id,
                 'linked_role': linked_role.id,
                 'waiting_channel': waiting_channel.id,
-                'results_channel': results_channel.id
+                'results_channel': results_channel.id,
+                'leaderboard_channel': leaderboard_channel.id,
             }
             await db.update_guild_data(guild.id, dict_data)

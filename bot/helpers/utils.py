@@ -107,22 +107,46 @@ def generate_statistics_img(stats):
         name_box = draw.textbbox((0, 0), name, font=fontbig)
         name_width = name_box[2] - name_box[0]
 
-        kdr = f'{stats.kills / stats.deaths:.2f}' if stats.deaths else '0'
-        win_percent = f'{stats.wins / stats.played_matches * 100:.0f}%' if stats.played_matches else '0%'
-        hsp = f'{stats.headshots / stats.kills * 100:.0f}%' if stats.kills else '0%'
-
         draw.text(((width - name_width) // 2, 90), name, font=fontbig)
         draw.text((51, 226+109*0), align_text(str(stats.kills), 14), font=font)
         draw.text((51, 226+109*1), align_text(str(stats.deaths), 14), font=font)
         draw.text((51, 226+109*2), align_text(str(stats.assists), 14), font=font)
-        draw.text((51, 226+109*3), align_text(str(kdr), 14), font=font)
+        draw.text((51, 226+109*3), align_text(str(stats.kdr), 14), font=font)
         draw.text((51, 226+109*4), align_text(str(stats.headshots), 14), font=font)
-        draw.text((359, 226+109*0), align_text(str(hsp), 20), font=font)
+        draw.text((359, 226+109*0), align_text(str(stats.hsp), 20), font=font)
         draw.text((359, 226+109*1), align_text(str(stats.played_matches), 20), font=font)
         draw.text((359, 226+109*2), align_text(str(stats.wins), 20), font=font)
-        draw.text((359, 226+109*3), align_text(str(win_percent), 20), font=font)
+        draw.text((359, 226+109*3), align_text(str(stats.win_percent), 20), font=font)
         draw.text((359, 226+109*4), align_text(str(stats.elo), 20), font=font)
 
         img.save(SAVE_IMG_DIR + '/statistics.png')
 
     return File(SAVE_IMG_DIR + '/statistics.png')
+
+
+def generate_leaderboard_img(players_stats):
+    """"""
+    width, height = 1096, 895
+
+    with Image.open(TEMPLATES_DIR + "/leaderboard.png") as img:
+        font = ImageFont.truetype(FONTS_DIR + "/ARIALUNI.TTF", 25)
+        fontbig = ImageFont.truetype(FONTS_DIR + "/ARIALUNI.TTF", 36)
+        draw = ImageDraw.Draw(img)
+
+        title = 'Leaderboard'
+        title_box = draw.textbbox((0, 0), title, font=fontbig)
+        title_width = title_box[2] - title_box[0]
+
+        draw.text(((width - title_width) // 2, 60), title, font=fontbig)
+
+        for idx, p in enumerate(players_stats):
+            draw.text((73, 235+65*idx), str(p.member.display_name)[:14], font=font)
+            draw.text((340, 235+65*idx), str(p.kills), font=font)
+            draw.text((500, 235+65*idx), str(p.deaths), font=font)
+            draw.text((660, 235+65*idx), str(p.played_matches), font=font)
+            draw.text((820, 235+65*idx), str(p.wins), font=font)
+            draw.text((980, 235+65*idx), str(p.elo), font=font)
+
+        img.save(SAVE_IMG_DIR + '/leaderboard.png')
+
+    return File(SAVE_IMG_DIR + '/leaderboard.png')

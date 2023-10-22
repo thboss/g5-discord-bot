@@ -8,11 +8,11 @@ __depends__ = {}
 
 steps = [
     step(
-        'CREATE TYPE team_method AS ENUM(\'captains\', \'random\');',
+        'CREATE TYPE team_method AS ENUM(\'captains\', \'autobalance\', \'random\');',
         'DROP TYPE team_method;'
     ),
     step(
-        'CREATE TYPE captain_method AS ENUM(\'volunteer\', \'random\');',
+        'CREATE TYPE captain_method AS ENUM(\'volunteer\', \'rank\', \'random\');',
         'DROP TYPE captain_method;'
     ),
     step(
@@ -34,6 +34,7 @@ steps = [
             '    linked_role BIGINT DEFAULT NULL,\n'
             '    category BIGINT DEFAULT NULL\n,'
             '    waiting_channel BIGINT DEFAULT NULL,\n'
+            '    leaderboard_channel BIGINT DEFAULT NULL,\n'
             '    results_channel BIGINT DEFAULT NULL\n'
             ');'
         ),

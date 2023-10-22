@@ -38,6 +38,18 @@ class UserModel:
         self.played_matches = played_matches
         self.elo = elo
 
+    @property
+    def kdr(self):
+        return f'{self.kills / self.deaths:.2f}' if self.deaths else '0'
+    
+    @property
+    def hsp(self):
+        return f'{self.headshots / self.kills * 100:.0f}%' if self.kills else '0%'
+    
+    @property
+    def win_percent(self):
+        return f'{self.wins / self.played_matches * 100:.0f}%' if self.played_matches else '0%'
+
     @classmethod
     def from_dict(cls, data: dict, member: discord.Member) -> "UserModel":
         """"""
