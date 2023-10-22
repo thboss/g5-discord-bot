@@ -24,12 +24,16 @@ steps = [
         'DROP TYPE game_mode;'
     ),
     step(
+        'CREATE TYPE team AS ENUM(\'team1\', \'team2\', \'spec\');',
+        'DROP TYPE team;'
+    ),
+    step(
         (
             'CREATE TABLE guilds(\n'
             '    id BIGSERIAL PRIMARY KEY,\n'
             '    linked_role BIGINT DEFAULT NULL,\n'
-            '    waiting_channel BIGINT DEFAULT NULL,\n'
             '    category BIGINT DEFAULT NULL\n,'
+            '    waiting_channel BIGINT DEFAULT NULL,\n'
             '    results_channel BIGINT DEFAULT NULL\n'
             ');'
         ),
@@ -71,8 +75,19 @@ steps = [
     step(
         (
             'CREATE TABLE users(\n'
-            '    discord_id BIGSERIAL UNIQUE,\n'
-            '    steam_id VARCHAR(18) UNIQUE\n'
+            '    id BIGSERIAL UNIQUE,\n'
+            '    steam_id VARCHAR(18) UNIQUE,\n'
+            '    kills INTEGER DEFAULT 0,\n'
+            '    deaths INTEGER DEFAULT 0,\n'
+            '    assists INTEGER DEFAULT 0,\n'
+            '    headshots INTEGER DEFAULT 0,\n'
+            '    k2 INTEGER DEFAULT 0,\n'
+            '    k3 INTEGER DEFAULT 0,\n'
+            '    k4 INTEGER DEFAULT 0,\n'
+            '    k5 INTEGER DEFAULT 0,\n'
+            '    wins INTEGER DEFAULT 0,\n'
+            '    played_matches INTEGER DEFAULT 0,\n'
+            '    elo INTEGER DEFAULT 1000\n'
             ');'
         ),
         'DROP TABLE users;'
@@ -81,7 +96,7 @@ steps = [
         (
             'CREATE TABLE queued_users(\n'
             '    lobby_id INTEGER REFERENCES lobbies (id) ON DELETE CASCADE,\n'
-            '    user_id BIGINT REFERENCES users (discord_id) ON DELETE CASCADE,\n'
+            '    user_id BIGINT REFERENCES users (id) ON DELETE CASCADE,\n'
             '    CONSTRAINT queued_user_pkey PRIMARY KEY (lobby_id, user_id)\n'
             ');'
         ),
@@ -91,7 +106,8 @@ steps = [
         (
             'CREATE TABLE match_users(\n'
             '    match_id VARCHAR(64) REFERENCES matches (id) ON DELETE CASCADE,\n'
-            '    user_id BIGINT REFERENCES users (discord_id),\n'
+            '    user_id BIGINT REFERENCES users (id),\n'
+            '    team team DEFAULT NULL,\n'
             '    CONSTRAINT match_user_pkey PRIMARY KEY (match_id, user_id)\n'
             ');'
         ),
@@ -111,7 +127,7 @@ steps = [
         (
             'CREATE TABLE spectators(\n'
             '    guild_id BIGINT REFERENCES guilds (id) ON DELETE CASCADE,\n'
-            '    user_id BIGINT REFERENCES users (discord_id) ON DELETE CASCADE,\n'
+            '    user_id BIGINT REFERENCES users (id) ON DELETE CASCADE,\n'
             '    CONSTRAINT spectator_pkey PRIMARY KEY (guild_id, user_id)\n'
             ');'
         ),

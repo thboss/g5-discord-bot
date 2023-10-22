@@ -29,7 +29,7 @@ class LinkCog(commands.Cog, name='Link'):
 
         try:
             await db.insert_user({
-                'discord_id': user.id,
+                'id': user.id,
                 'steam_id': f"'{steam_id}'",
             })
         except UniqueViolationError:

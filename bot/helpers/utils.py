@@ -1,7 +1,16 @@
 from steam.steamid import SteamID, from_url
+from PIL import Image, ImageFont, ImageDraw
+from discord import File
 import math
+import os
 
 from .errors import CustomError
+
+
+ABS_ROOT_DIR = os.path.abspath(os.curdir)
+TEMPLATES_DIR = os.path.join(ABS_ROOT_DIR, 'assets', 'img', 'templates')
+FONTS_DIR = os.path.join(ABS_ROOT_DIR, 'assets', 'fonts')
+SAVE_IMG_DIR = os.path.join(ABS_ROOT_DIR, 'assets', 'img')
 
 
 COUNTRY_FLAGS = [
@@ -68,3 +77,52 @@ def align_text(text, length, align='center'):
         raise ValueError('Align argument must be "center", "left" or "right"')
 
     return ' ' * pre + text + ' ' * post
+
+
+def calculate_elo(stats, old_elo=1000):
+    weight = max(2 - 0.1 * ((old_elo - 800) / 100), 0.1)
+    winner = 1 if stats.winner else -1
+    new_elo = old_elo + round((
+        stats.kills +
+        stats.assists * 0.5 +
+        stats.k2 * 2 +
+        stats.k3 * 3 +
+        stats.k4 * 4 +
+        stats.k5 * 5 +
+        winner * 5) * weight - \
+        stats.deaths)
+    
+    return new_elo
+
+
+def generate_statistics_img(stats):
+    """"""
+    width, height = 543, 745
+    with Image.open(TEMPLATES_DIR + "/statistics.png") as img:
+        font = ImageFont.truetype(FONTS_DIR + "/ARIALUNI.TTF", 25)
+        draw = ImageDraw.Draw(img)
+        fontbig = ImageFont.truetype(FONTS_DIR + "/ARIALUNI.TTF", 36)
+
+        name = stats.member.display_name[:14]
+        name_box = draw.textbbox((0, 0), name, font=fontbig)
+        name_width = name_box[2] - name_box[0]
+
+        kdr = f'{stats.kills / stats.deaths:.2f}' if stats.deaths else '0'
+        win_percent = f'{stats.wins / stats.played_matches * 100:.0f}%' if stats.played_matches else '0%'
+        hsp = f'{stats.headshots / stats.kills * 100:.0f}%' if stats.kills else '0%'
+
+        draw.text(((width - name_width) // 2, 90), name, font=fontbig)
+        draw.text((51, 226+109*0), align_text(str(stats.kills), 14), font=font)
+        draw.text((51, 226+109*1), align_text(str(stats.deaths), 14), font=font)
+        draw.text((51, 226+109*2), align_text(str(stats.assists), 14), font=font)
+        draw.text((51, 226+109*3), align_text(str(kdr), 14), font=font)
+        draw.text((51, 226+109*4), align_text(str(stats.headshots), 14), font=font)
+        draw.text((359, 226+109*0), align_text(str(hsp), 20), font=font)
+        draw.text((359, 226+109*1), align_text(str(stats.played_matches), 20), font=font)
+        draw.text((359, 226+109*2), align_text(str(stats.wins), 20), font=font)
+        draw.text((359, 226+109*3), align_text(str(win_percent), 20), font=font)
+        draw.text((359, 226+109*4), align_text(str(stats.elo), 20), font=font)
+
+        img.save(SAVE_IMG_DIR + '/statistics.png')
+
+    return File(SAVE_IMG_DIR + '/statistics.png')

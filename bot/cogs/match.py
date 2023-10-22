@@ -9,7 +9,7 @@ import asyncio
 
 from bot.helpers.api import api, Match
 from bot.helpers.db import db
-from bot.helpers.models import GuildModel, MatchModel, UserModel
+from bot.helpers.models import GuildModel, MatchModel
 from bot.bot import G5Bot
 from bot.helpers.errors import APIError, CustomError
 from bot.views import VetoView, PickTeamsView
@@ -34,7 +34,7 @@ class MatchCog(commands.Cog, name="Match"):
         if not match_model:
             raise CustomError("Invalid match ID.")
         
-        await self.finalize_match(match_model, guild_model)
+        await self.finalize_match(match_model, guild_model, match_cancelled=True)
 
         embed = Embed(description=f"Match #{match_id} cancelled successfully.")
         await interaction.followup.send(embed=embed)
@@ -80,19 +80,12 @@ class MatchCog(commands.Cog, name="Match"):
         team2_users = temp_users[team_size:]
         return team1_users, team2_users
     
-    def add_teams_fields(self, embed: Embed, match_stats: Match, match_players: List[UserModel]):
+    def add_teams_fields(self, embed: Embed, team1_users: List[Member], team2_users: List[Member]):
         """"""
-        team1_steam_ids = [player.steam_id for player in match_stats.team1_players]
-        team2_steam_ids = [player.steam_id for player in match_stats.team2_players]
-        team1_users = list(filter(lambda u: u.steam in team1_steam_ids, match_players))
-        team2_users = list(filter(lambda u: u.steam in team2_steam_ids, match_players))
-        
-        embed.add_field(name="Team 1", value="\n".join(
-            f'{u.member.mention} ([Steam](https://steamcommunity.com/profiles/{u.steam}/))' 
+        embed.add_field(name="Team 1", value="\n".join(f'{u.mention}' 
             for u in team1_users), inline=False)
         
-        embed.add_field(name="Team 2", value="\n".join(
-            f'{u.member.mention} ([Steam](https://steamcommunity.com/profiles/{u.steam}/))' 
+        embed.add_field(name="Team 2", value="\n".join(f'{u.mention}' 
             for u in team2_users), inline=False)
 
     def embed_match_info(
@@ -121,7 +114,6 @@ class MatchCog(commands.Cog, name="Match"):
         if is_live:
             embed.set_footer(
                 text= "🔸You'll be put on a random team when joining the server.\n" \
-                      "🔸Warmup is deathmatch mode with all players being enemies.\n" \
                       "🔸Once the match starts you'll be moved to your correct team.\n" \
                      f"🔸Match will be cancelled if any player doesn't join the server within {match_stats.connect_time} seconds.\n")
         else:
@@ -212,8 +204,7 @@ class MatchCog(commands.Cog, name="Match"):
 
             await db.insert_match_users(api_match.id, team1_users + team2_users)
             embed = self.embed_match_info(api_match, game_server)
-            match_players = team1_users_model + team2_users_model
-            self.add_teams_fields(embed, api_match, match_players)
+            self.add_teams_fields(embed, team1_users, team2_users)
 
         except APIError as e:
             description = e.message
@@ -292,9 +283,21 @@ class MatchCog(commands.Cog, name="Match"):
 
         return match_catg, team1_channel, team2_channel
 
-    async def finalize_match(self, match_model: MatchModel, guild_model: GuildModel):
+    async def finalize_match(self, match_model: MatchModel, guild_model: GuildModel, match_cancelled=False):
         """"""
         match_players = await db.get_match_users(match_model.id, match_model.guild)
+        if not match_cancelled:
+            try:
+                match_stats = await api.get_match(match_model.id)
+                for player_stat in match_stats.team1_players + match_stats.team2_players:
+                    try:
+                        user_model = await db.get_user_by_steam_id(player_stat.steam_id, self.bot)
+                        await db.update_user_stats(user_model.member.id, player_stat)
+                    except Exception as e:
+                        self.bot.logger.error(e, exc_info=1)
+            except Exception as e:
+                self.bot.logger.error(e, exc_info=1)
+
         move_aws = [user.move_to(guild_model.waiting_channel) for user in match_players]
         await asyncio.gather(*move_aws, return_exceptions=True)
         
@@ -303,7 +306,6 @@ class MatchCog(commands.Cog, name="Match"):
             await match_model.team2_channel.delete()
             await match_model.category.delete()
         except Exception as e:
-            self.bot.logger.error(e, exc_info=1)
             pass
 
         await db.delete_match(match_model.id)
@@ -326,7 +328,7 @@ class MatchCog(commands.Cog, name="Match"):
             pass
 
         if not api_match:
-            await self.finalize_match(match_model, guild_model)
+            await self.finalize_match(match_model, guild_model, match_cancelled=True)
             return
 
         try:
@@ -335,11 +337,11 @@ class MatchCog(commands.Cog, name="Match"):
             pass
 
         if message:
-            embed = self.embed_match_info(api_match, game_server)
-            match_players = await db.get_match_users(api_match.id, match_model.guild)
-            match_players = await db.get_users(match_players)
-            self.add_teams_fields(embed, api_match, match_players)
             try:
+                embed = self.embed_match_info(api_match, game_server)
+                team1_users = await db.get_match_users(api_match.id, match_model.guild, team='team1')
+                team2_users = await db.get_match_users(api_match.id, match_model.guild, team='team2')
+                self.add_teams_fields(embed, api_match, team1_users, team2_users)
                 await message.edit(embed=embed)
             except Exception as e:
                 pass
@@ -354,15 +356,14 @@ class MatchCog(commands.Cog, name="Match"):
 
         try:
             embed = self.embed_match_info(api_match)
-            match_players = await db.get_match_users(api_match.id, match_model.guild)
-            match_players = await db.get_users(match_players)
-            self.add_teams_fields(embed, api_match, match_players)
+            team1_users = await db.get_match_users(api_match.id, match_model.guild, team='team1')
+            team2_users = await db.get_match_users(api_match.id, match_model.guild, team='team2')
+            self.add_teams_fields(embed, api_match, team1_users, team2_users)
             await guild_model.results_channel.send(embed=embed)
         except Exception as e:
-            self.bot.logger.error(e, exc_info=1)
             pass
 
-        await self.finalize_match(match_model, guild_model)
+        await self.finalize_match(match_model, guild_model, match_cancelled=api_match.cancel_reason is not None)
 
     @ tasks.loop(seconds=20.0)
     async def check_live_matches(self):

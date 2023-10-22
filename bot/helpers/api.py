@@ -10,7 +10,7 @@ from bot.helpers.errors import APIError
 
 
 class MatchPlayer:
-    def __init__(self, data):
+    def __init__(self, data, winner):
         self.match_id = data['match_id']
         self.steam_id = data['steam_id_64']
         self.team = data['team']
@@ -18,13 +18,19 @@ class MatchPlayer:
         self.kicked = data['kicked']
         self.kills = data['stats']['kills']
         self.assists = data['stats']['assists']
+        self.headshots = data['stats']['kills_with_headshot']
         self.deaths = data['stats']['deaths']
         self.mvps = data['stats']['mvps']
+        self.k2 = data['stats']['2ks']
+        self.k3 = data['stats']['3ks']
+        self.k4 = data['stats']['4ks']
+        self.k5 = data['stats']['5ks']
         self.score = data['stats']['score']
+        self.winner = winner
 
     @classmethod
-    def from_dict(cls, data: dict) -> "MatchPlayer":
-        return cls(data)
+    def from_dict(cls, data: dict, winner) -> "MatchPlayer":
+        return cls(data, winner)
 
 
 class Match:
@@ -43,8 +49,8 @@ class Match:
         self.connect_time = match_data['settings']['connect_time']
         self.map = match_data['settings']['map']
         self.rounds_played = match_data['rounds_played']
-        self.team1_players = [MatchPlayer.from_dict(player) for player in match_data['players'] if player['team'] == 'team1']
-        self.team2_players = [MatchPlayer.from_dict(player) for player in match_data['players'] if player['team'] == 'team2']
+        self.team1_players = [MatchPlayer.from_dict(player, self.team1_score > self.team2_score) for player in match_data['players'] if player['team'] == 'team1']
+        self.team2_players = [MatchPlayer.from_dict(player, self.team1_score < self.team2_score) for player in match_data['players'] if player['team'] == 'team2']
 
     @classmethod
     def from_dict(cls, data: dict) -> "Match":
