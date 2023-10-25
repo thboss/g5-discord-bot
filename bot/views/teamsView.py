@@ -5,7 +5,7 @@ from discord.ui import View, Button
 from random import shuffle
 from typing import List
 
-from bot.helpers.api import api
+from bot.helpers.db import db
 
 
 class PlayerButton(Button['PickTeamsView']):
@@ -122,6 +122,17 @@ class PickTeamsView(View):
         return embed
 
     async def start(self, captain_method: str):
+        """"""
+        if captain_method == 'rank':
+            players_stats = await db.get_users(self.users)
+            players_stats.sort(key=lambda x: x.elo)
+
+            for team in self.teams:
+                captain = players_stats.pop().member
+                self.users_left.remove(captain)
+                team.append(captain)
+                self._remove_captain_button(captain)
+
         if captain_method == 'random':
             temp_users = self.users_left.copy()
             shuffle(temp_users)

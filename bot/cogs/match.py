@@ -31,7 +31,6 @@ class MatchCog(commands.Cog, name="Match"):
 
         guild_model = await db.get_guild_by_id(interaction.guild.id, self.bot)
         match_model = await db.get_match_by_id(match_id, self.bot)
-        match_players = await db.get_match_users(match_id, match_model.guild)
         if not match_model:
             raise CustomError("Invalid match ID.")
         
@@ -43,24 +42,15 @@ class MatchCog(commands.Cog, name="Match"):
         try:
             match_msg = await match_model.text_channel.fetch_message(match_model.message_id)
             await match_msg.delete()
-        except Exception as e:
-            pass
-
-        api_match = await api.get_match(match_id)
-        api_match.finished = True
-        try:
-            embed = self.embed_match_info(api_match)
-            match_players = await db.get_users(match_players)
-            self.add_teams_fields(embed, api_match, match_players)
-            await guild_model.results_channel.send(embed=embed)
         except:
             pass
 
         try:
             await api.stop_game_server(match_model.game_server_id)
+            await asyncio.sleep(3)
             await api.start_game_server(match_model.game_server_id)
-        except:
-            pass
+        except Exception as e:
+            self.bot.logger.error(e, exc_info=True)
 
     async def pick_teams(self, message: Message, users: List[Member], captain_method: str):
         """"""
@@ -71,6 +61,30 @@ class MatchCog(commands.Cog, name="Match"):
         if teams_view.users_left:
             raise asyncio.TimeoutError
         return teams_view.teams[0], teams_view.teams[1]
+    
+    async def autobalance_teams(self, users: List[Member]):
+        """"""
+        players_stats = await db.get_users(users)
+        players_stats.sort(key=lambda x: x.elo)
+
+        # Balance teams
+        team_size = len(players_stats) // 2
+        team1_stats = [players_stats.pop()]
+        team2_stats = [players_stats.pop()]
+
+        while players_stats:
+            if len(team1_stats) >= team_size:
+                team2_stats.append(players_stats.pop())
+            elif len(team2_stats) >= team_size:
+                team1_stats.append(players_stats.pop())
+            elif sum(p.elo for p in team1_stats) < sum(p.elo for p in team2_stats):
+                team1_stats.append(players_stats.pop())
+            else:
+                team2_stats.append(players_stats.pop())
+
+        team1_users = [user_model.member for user_model in team1_stats]
+        team2_users = [user_model.member for user_model in team2_stats]
+        return team1_users, team2_users
 
     def randomize_teams(self, users: List[Member]):
         """"""
@@ -105,21 +119,17 @@ class MatchCog(commands.Cog, name="Match"):
         description += f'🗺️ **Map:** {match_stats.map}\n\n'
         embed = Embed(title=title, description=description)
 
-        is_live = not match_stats.finished and not match_stats.cancel_reason
-        author_name = f"{'🟢' if is_live else '🔴'} Match #{match_stats.id}"
+        author_name = f"🟢 Match #{match_stats.id}"
         embed.set_author(name=author_name)
 
         if self.bot.user.avatar:
             embed.set_thumbnail(url=self.bot.user.avatar.url)
 
-        if is_live:
-            embed.set_footer(
-                text= "🔸You'll be put on a random team when joining the server.\n" \
-                      "🔸Once the match starts you'll be moved to your correct team.\n" \
-                     f"🔸Match will be cancelled if any player doesn't join the server within {match_stats.connect_time} seconds.\n")
-        else:
-            if match_stats.cancel_reason and "MISSING_PLAYERS" in match_stats.cancel_reason:
-                embed.set_footer(text="Cancel Reason: Some players didn't join the game server.")
+        embed.set_footer(
+            text= "🔸You'll be put on a random team when joining the server.\n" \
+                  "🔸Once the match starts you'll be moved to your correct team.\n" \
+                 f"🔸Match will be cancelled if any player doesn't join the server within {match_stats.connect_time} seconds.\n")
+
         return embed
 
     async def start_match(
@@ -138,6 +148,8 @@ class MatchCog(commands.Cog, name="Match"):
         try:
             if team_method == 'captains' and len(queue_users) >= 4:
                 team1_users, team2_users = await self.pick_teams(message, queue_users, captain_method)
+            elif team_method == 'autobalance' and len(queue_users) >= 4:
+                team1_users, team2_users = await self.autobalance_teams(queue_users)
             else:
                 team1_users, team2_users = self.randomize_teams(queue_users)
             
@@ -214,12 +226,12 @@ class MatchCog(commands.Cog, name="Match"):
         except ValueError as e:
             description = e
         except Exception as e:
-            self.bot.log_exception('Unhandled exception in "cogs.match.start_match": ', e)
+            self.bot.logger.error(e, exc_info=1)
             description = 'Something went wrong! See logs for details'
         else:
             try:
                 await message.edit(embed=embed, view=None)
-            except Exception as e:
+            except:
                 pass
 
             if not self.check_live_matches.is_running():
@@ -231,7 +243,7 @@ class MatchCog(commands.Cog, name="Match"):
                       description=description, color=0xE02B2B)
         try:
             await message.edit(embed=embed, view=None)
-        except Exception as e:
+        except:
             pass
 
     async def find_match_server(self):

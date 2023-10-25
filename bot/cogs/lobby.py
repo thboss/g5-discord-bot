@@ -27,11 +27,13 @@ CAPACITY_CHOICES = [
 
 TEAM_SELECTION_CHOICES = [
     app_commands.Choice(name="Random", value="random"),
+    app_commands.Choice(name="Autobalance", value="autobalance"),
     app_commands.Choice(name="Captains", value="captains"),
 ]
 
 CAPTAIN_SELECTION_CHOICES = [
     app_commands.Choice(name="Random", value="random"),
+    app_commands.Choice(name="Rank", value="rank"),
     app_commands.Choice(name="Volunteer", value="volunteer"),
 ]
 
