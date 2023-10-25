@@ -9,6 +9,7 @@ import asyncio
 
 from bot.helpers.api import api, Match
 from bot.helpers.db import db
+from bot.helpers.utils import generate_scoreboard_img
 from bot.helpers.models import GuildModel, MatchModel
 from bot.bot import G5Bot
 from bot.helpers.errors import APIError, CustomError
@@ -285,19 +286,36 @@ class MatchCog(commands.Cog, name="Match"):
 
     async def finalize_match(self, match_model: MatchModel, guild_model: GuildModel, match_cancelled=False):
         """"""
-        match_players = await db.get_match_users(match_model.id, match_model.guild)
         if not match_cancelled:
             try:
                 match_stats = await api.get_match(match_model.id)
+                try:
+                    team1_stats = match_stats.team1_players
+                    team2_stats = match_stats.team2_players
+                    for p in team1_stats:
+                        user_model = await db.get_user_by_steam_id(p.steam_id, self.bot)
+                        p.member = user_model.member
+                    for p in team2_stats:
+                        user_model = await db.get_user_by_steam_id(p.steam_id, self.bot)
+                        p.member = user_model.member
+                    team1_stats.sort(key=lambda x: x.score, reverse=True)
+                    team2_stats.sort(key=lambda x: x.score, reverse=True)
+                    file = generate_scoreboard_img(match_stats, team1_stats[:6], team2_stats[:6])
+                    await guild_model.results_channel.send(file=file)
+                except Exception as e:
+                    self.bot.logger.error(e, exc_info=1)
+
                 for player_stat in match_stats.team1_players + match_stats.team2_players:
                     try:
                         user_model = await db.get_user_by_steam_id(player_stat.steam_id, self.bot)
                         await db.update_user_stats(user_model.member.id, player_stat)
                     except Exception as e:
                         self.bot.logger.error(e, exc_info=1)
+
             except Exception as e:
                 self.bot.logger.error(e, exc_info=1)
 
+        match_players = await db.get_match_users(match_model.id, match_model.guild)
         move_aws = [user.move_to(guild_model.waiting_channel) for user in match_players]
         await asyncio.gather(*move_aws, return_exceptions=True)
         
@@ -351,15 +369,6 @@ class MatchCog(commands.Cog, name="Match"):
 
         try:
             await message.delete()
-        except Exception as e:
-            pass
-
-        try:
-            embed = self.embed_match_info(api_match)
-            team1_users = await db.get_match_users(api_match.id, match_model.guild, team='team1')
-            team2_users = await db.get_match_users(api_match.id, match_model.guild, team='team2')
-            self.add_teams_fields(embed, api_match, team1_users, team2_users)
-            await guild_model.results_channel.send(embed=embed)
         except Exception as e:
             pass
 

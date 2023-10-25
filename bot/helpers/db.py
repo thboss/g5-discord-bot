@@ -363,6 +363,28 @@ class DBManager:
         sql = "SELECT id FROM matches WHERE game_server_id = $1;"
         return await self.query(sql, game_server_id)
     
+    async def reset_user_stats(self, user_id: int):
+        """"""
+        dict_stats = {
+            'kills' : 0,
+            'deaths' : 0,
+            'assists' : 0,
+            'headshots' : 0,
+            'k2' : 0,
+            'k3' : 0,
+            'k4' : 0,
+            'k5' : 0,
+            'played_matches' : 0,
+            'wins' : 0,
+            'elo' : 1000,
+        }
+
+        col_vals = ",\n    ".join(
+            f"{key} = {val}" for key, val in dict_stats.items())
+
+        sql = f'UPDATE users SET {col_vals} WHERE id = $1;'
+        await self.query(sql, user_id)
+    
     async def update_user_stats(self, user_id: int, stats: MatchPlayer):
         """"""
         sql = "SELECT * FROM users WHERE id = $1;"

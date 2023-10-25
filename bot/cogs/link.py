@@ -7,25 +7,30 @@ from discord import app_commands, Embed, Interaction
 from bot.helpers.db import db
 from bot.helpers.errors import CustomError
 from bot.helpers.utils import validate_steam
+from bot.bot import G5Bot
 
 
 class LinkCog(commands.Cog, name='Link'):
-    def __init__(self, bot):
+    def __init__(self, bot: G5Bot):
         self.bot = bot
 
-    @app_commands.command(name='link', description='Link users to their Steam.')
-    @app_commands.describe(
-        steam='Steam ID or Steam profle link'
-    )
-    async def link(self, interaction: Interaction, steam: str):
+    @app_commands.command(name='link-steam', description='Link your Discord account to Steam.')
+    @app_commands.describe(steam='Steam ID or Steam profle link')
+    async def link_steam(self, interaction: Interaction, steam: str):
         await interaction.response.defer(ephemeral=True)
         user = interaction.user
-        user_model = await db.get_user_by_discord_id(user.id, self.bot)
-        if user_model:
-            raise CustomError(
-                f"Your account is already linked to Steam")
-
         steam_id = validate_steam(steam)
+        user_model = await db.get_user_by_discord_id(user.id, self.bot)
+
+        if user_model:
+            all_commands = await self.bot.tree.fetch_commands()
+            change_command = None
+            for c in all_commands:
+                if c.name == "change-steam":
+                    change_command = c
+            raise CustomError(
+                f"**You are already linked to [Steam](https://steamcommunity.com/profiles/{user_model.steam}/)**\n" \
+                f"Use {change_command.mention} if you want to link to different Steam.")
 
         try:
             await db.insert_user({
@@ -35,52 +40,61 @@ class LinkCog(commands.Cog, name='Link'):
         except UniqueViolationError:
             raise CustomError(
                 f"This Steam is linked to another user. Please try different Steam ID.")
-        except Exception:
+        except Exception as e:
+            self.bot.logger.error(e, exc_info=1)
             raise CustomError("Something went wrong! Please try again later.")
 
         guild_model = await db.get_guild_by_id(interaction.guild_id, self.bot)
         await user.add_roles(guild_model.linked_role)
 
         embed = Embed(
-            description=f"You have successfully linked your account to [Steam](https://steamcommunity.com/profiles/{steam_id}/)")
+            description=f"You have successfully linked to [Steam](https://steamcommunity.com/profiles/{steam_id}/)")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="unlink", description="Unlink users from their Steam")
-    async def unlink(self, interaction: Interaction):
+    @app_commands.command(name="change-steam", description="Change your linked Steam")
+    @app_commands.describe(steam='Steam ID or Steam profle link')
+    async def change_steam(self, interaction: Interaction, steam: str):
         """"""
         await interaction.response.defer(ephemeral=True)
         user = interaction.user
-
+        steam_id = validate_steam(steam)
         user_model = await db.get_user_by_discord_id(user.id, self.bot)
-        if not user_model:
-            raise CustomError("Your account is not linked to Steam.")
 
-        user_lobby = await db.get_user_lobby(user.id, interaction.guild)
-        if user_lobby:
-            raise CustomError(
-                f"You can't unlink your account while you are in Lobby #{user_lobby.id}.")
+        if not user_model:
+            all_commands = await self.bot.tree.fetch_commands()
+            link_command = None
+            for c in all_commands:
+                if c.name == "link-steam":
+                    link_command = c
+            raise CustomError("Your account is not linked to Steam.\n" \
+                              f"Please use {link_command.mention} to link your account.")
 
         user_match = await db.get_user_match(user.id, interaction.guild)
         if user_match:
             raise CustomError(
-                f"You can't unlink your account while you are in match #{user_match.id}")
+                f"You can't change your steam while you are in match #{user_match.id}")
         
         spectators = await db.get_spectators(interaction.guild)
         for spec in spectators:
             if spec.user == user:
                 raise CustomError(
-                    "You can't unlink your account while you are in spectators list.")
+                    "You can't change your steam while you are in spectators list.")
+            
 
         try:
-            await db.delete_user(user.id)
+            await db.update_user(user.id, {'steam_id': f"'{steam_id}'"})
+        except UniqueViolationError:
+            raise CustomError(
+                f"This Steam is linked to another user. Please try different Steam ID.")
         except Exception as e:
+            self.bot.logger.error(e, exc_info=1)
             raise CustomError("Something went wrong! Please try again later.")
 
         guild_model = await db.get_guild_by_id(interaction.guild_id, self.bot)
-        await user.remove_roles(guild_model.linked_role)
+        await user.add_roles(guild_model.linked_role)
 
         embed = Embed(
-            description="You have successfully unlinked your account.")
+            description=f"You have successfully updated your [Steam](https://steamcommunity.com/profiles/{steam_id}/)")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
 

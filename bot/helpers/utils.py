@@ -108,16 +108,16 @@ def generate_statistics_img(stats):
         name_width = name_box[2] - name_box[0]
 
         draw.text(((width - name_width) // 2, 90), name, font=fontbig)
-        draw.text((51, 226+109*0), align_text(str(stats.kills), 14), font=font)
-        draw.text((51, 226+109*1), align_text(str(stats.deaths), 14), font=font)
-        draw.text((51, 226+109*2), align_text(str(stats.assists), 14), font=font)
-        draw.text((51, 226+109*3), align_text(str(stats.kdr), 14), font=font)
-        draw.text((51, 226+109*4), align_text(str(stats.headshots), 14), font=font)
-        draw.text((359, 226+109*0), align_text(str(stats.hsp), 20), font=font)
-        draw.text((359, 226+109*1), align_text(str(stats.played_matches), 20), font=font)
-        draw.text((359, 226+109*2), align_text(str(stats.wins), 20), font=font)
-        draw.text((359, 226+109*3), align_text(str(stats.win_percent), 20), font=font)
-        draw.text((359, 226+109*4), align_text(str(stats.elo), 20), font=font)
+        draw.text((57, 226+109*0), align_text(str(stats.kills), 14), font=font)
+        draw.text((57, 226+109*1), align_text(str(stats.deaths), 14), font=font)
+        draw.text((57, 226+109*2), align_text(str(stats.assists), 14), font=font)
+        draw.text((57, 226+109*3), align_text(str(stats.kdr), 14), font=font)
+        draw.text((57, 226+109*4), align_text(str(stats.headshots), 14), font=font)
+        draw.text((353, 226+109*0), align_text(str(stats.hsp), 20), font=font)
+        draw.text((353, 226+109*1), align_text(str(stats.played_matches), 20), font=font)
+        draw.text((353, 226+109*2), align_text(str(stats.wins), 20), font=font)
+        draw.text((353, 226+109*3), align_text(str(stats.win_percent), 20), font=font)
+        draw.text((353, 226+109*4), align_text(str(stats.elo), 20), font=font)
 
         img.save(SAVE_IMG_DIR + '/statistics.png')
 
@@ -130,14 +130,7 @@ def generate_leaderboard_img(players_stats):
 
     with Image.open(TEMPLATES_DIR + "/leaderboard.png") as img:
         font = ImageFont.truetype(FONTS_DIR + "/ARIALUNI.TTF", 25)
-        fontbig = ImageFont.truetype(FONTS_DIR + "/ARIALUNI.TTF", 36)
         draw = ImageDraw.Draw(img)
-
-        title = 'Leaderboard'
-        title_box = draw.textbbox((0, 0), title, font=fontbig)
-        title_width = title_box[2] - title_box[0]
-
-        draw.text(((width - title_width) // 2, 60), title, font=fontbig)
 
         for idx, p in enumerate(players_stats):
             draw.text((73, 235+65*idx), str(p.member.display_name)[:14], font=font)
@@ -150,3 +143,45 @@ def generate_leaderboard_img(players_stats):
         img.save(SAVE_IMG_DIR + '/leaderboard.png')
 
     return File(SAVE_IMG_DIR + '/leaderboard.png')
+
+
+def generate_scoreboard_img(match_stats, team1_stats, team2_stats):
+    """"""
+    width, height = 992, 1065
+
+    with Image.open(TEMPLATES_DIR + "/scoreboard.png") as img:
+        font = ImageFont.truetype(FONTS_DIR + "/ARIALUNI.TTF", 25)
+        fontbig = ImageFont.truetype(FONTS_DIR + "/ARIALUNI.TTF", 32)
+        draw = ImageDraw.Draw(img)
+
+        title = f'{match_stats.team1_name[:20]}  [ {match_stats.team1_score} : {match_stats.team2_score} ]  {match_stats.team2_name[:20]}'
+        title_box = draw.textbbox((0, 0), title, font=fontbig)
+        title_width = title_box[2] - title_box[0]
+        draw.text(((width - title_width) // 2, 40), title, font=fontbig)
+
+        map_name = f"Map: {match_stats.map}"
+        map_box = draw.textbbox((0, 0), map_name, font=fontbig)
+        map_width = map_box[2] - map_box[0]
+        draw.text(((width - map_width) // 2, 85), map_name, font=fontbig)
+
+        draw.text((200, 172), match_stats.team1_name[:20], font=fontbig)
+        for idx, p in enumerate(team1_stats):
+            draw.text((58, 290+50*idx), str(p.member.display_name)[:14], font=font)
+            draw.text((340, 290+50*idx), str(p.kills), font=font)
+            draw.text((490, 290+50*idx), str(p.assists), font=font)
+            draw.text((640, 290+50*idx), str(p.deaths), font=font)
+            draw.text((790, 290+50*idx), str(p.mvps), font=font)
+            draw.text((900, 290+50*idx), str(p.score), font=font)
+    
+        draw.text((200, 643), match_stats.team2_name[:20], font=fontbig)
+        for idx, p in enumerate(team2_stats):
+            draw.text((58, 755+50*idx), str(p.member.display_name)[:14], font=font)
+            draw.text((340, 755+50*idx), str(p.kills), font=font)
+            draw.text((490, 755+50*idx), str(p.assists), font=font)
+            draw.text((640, 755+50*idx), str(p.deaths), font=font)
+            draw.text((790, 755+50*idx), str(p.mvps), font=font)
+            draw.text((900, 755+50*idx), str(p.score), font=font)
+
+        img.save(SAVE_IMG_DIR + '/scoreboard.png')
+
+    return File(SAVE_IMG_DIR + '/scoreboard.png')

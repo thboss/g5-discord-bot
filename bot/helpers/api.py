@@ -27,6 +27,7 @@ class MatchPlayer:
         self.k5 = data['stats']['5ks']
         self.score = data['stats']['score']
         self.winner = winner
+        self.member = None
 
     @classmethod
     def from_dict(cls, data: dict, winner) -> "MatchPlayer":
