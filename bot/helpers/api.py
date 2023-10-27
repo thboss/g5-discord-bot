@@ -110,7 +110,6 @@ class APIManager:
         self.logger.info('Starting API helper client session')
         self.session = aiohttp.ClientSession(
             base_url="https://dathost.net",
-            auth= aiohttp.BasicAuth(Config.dathost_email, Config.dathost_password),
             loop=loop,
             json_serialize=lambda x: json.dumps(x, ensure_ascii=False),
             timeout=aiohttp.ClientTimeout(total=30),
@@ -122,12 +121,12 @@ class APIManager:
         self.logger.info('Closing API helper client session')
         await self.session.close()
 
-    async def get_game_server(self, game_server_id: str) -> List[GameServer]:
+    async def get_game_server(self, game_server_id: str, auth: aiohttp.BasicAuth=None) -> List[GameServer]:
         """"""
         url = f"/api/0.1/game-servers/{game_server_id}"
 
         try:
-            async with self.session.get(url=url) as resp:
+            async with self.session.get(url=url, auth=auth) as resp:
                 resp_data = await resp.json()
                 if not resp.ok:
                     raise ValueError(resp_data)
@@ -137,43 +136,43 @@ class APIManager:
             raise APIError
         
 
-    async def get_game_servers(self) -> List[GameServer]:
+    async def get_game_servers(self, auth: aiohttp.BasicAuth=None) -> List[GameServer]:
         """"""
         url = f"/api/0.1/game-servers"
 
         try:
-            async with self.session.get(url=url) as resp:
+            async with self.session.get(url=url, auth=auth) as resp:
                 resp_data = await resp.json()
                 return [GameServer.from_dict(game_server) for game_server in resp_data]
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
 
-    async def stop_game_server(self, server_id: str):
+    async def stop_game_server(self, server_id: str, auth: aiohttp.BasicAuth=None):
         """"""
         url = f"/api/0.1/game-servers/{server_id}/stop"
 
         try:
-            async with self.session.post(url=url) as resp:
+            async with self.session.post(url=url, auth=auth) as resp:
                 await resp.json()
                 return resp.ok
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
         
-    async def start_game_server(self, server_id: str):
+    async def start_game_server(self, server_id: str, auth: aiohttp.BasicAuth=None):
         """"""
         url = f"/api/0.1/game-servers/{server_id}/start"
 
         try:
-            async with self.session.post(url=url) as resp:
+            async with self.session.post(url=url, auth=auth) as resp:
                 await resp.json()
                 return resp.ok
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
         
-    async def update_game_mode(self, server_id: str, game_mode):
+    async def update_game_mode(self, server_id: str, game_mode, auth: aiohttp.BasicAuth=None):
         """"""
         url = f"/api/0.1/game-servers/{server_id}"
         payload = {
@@ -181,14 +180,14 @@ class APIManager:
         }
 
         try:
-            async with self.session.put(url=url, data=payload) as resp:
+            async with self.session.put(url=url, data=payload, auth=auth) as resp:
                 await resp.json()
                 return resp.ok
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
 
-    async def send_rcon_to_game_server(self, server_id: str, cmd: str):
+    async def send_rcon_to_game_server(self, server_id: str, cmd: str, auth: aiohttp.BasicAuth=None):
         """"""
         url = f"/api/0.1/game-servers/{server_id}/console"
         payload = {
@@ -196,19 +195,19 @@ class APIManager:
         }
 
         try:
-            async with self.session.post(url=url, data=payload) as resp:
+            async with self.session.post(url=url, data=payload, auth=auth) as resp:
                 await resp.json()
                 return resp.ok
         except Exception as e:
             self.logger.error(e, exc_info=1)
             raise APIError
 
-    async def get_match(self, match_id: str) -> Optional["Match"]:
+    async def get_match(self, match_id: str, auth: aiohttp.BasicAuth=None) -> Optional["Match"]:
         """"""
         url = f"/api/0.1/cs2-matches/{match_id}"
 
         try:
-            async with self.session.get(url=url) as resp:
+            async with self.session.get(url=url, auth=auth) as resp:
                 resp_data = await resp.json()
                 if not resp.ok:
                     return
@@ -223,7 +222,8 @@ class APIManager:
         map_name: str,
         team1_name: str,
         team2_name: str,
-        players: List[dict]
+        players: List[dict],
+        auth: aiohttp.BasicAuth=None
     ) -> Match:
         """"""
 
@@ -242,7 +242,7 @@ class APIManager:
         }
 
         try:
-            async with self.session.post(url=url, json=payload) as resp:
+            async with self.session.post(url=url, json=payload, auth=auth) as resp:
                 resp_data = await resp.json()
                 if not resp.ok:
                     raise ValueError(resp_data)
@@ -255,7 +255,8 @@ class APIManager:
         self,
         match_id: int,
         steam_id: str,
-        team: Literal["team1", "team2", "spectator"]
+        team: Literal["team1", "team2", "spectator"],
+        auth: aiohttp.BasicAuth=None
     ):
         """"""
         url = f"/api/0.1/cs2-matches/{match_id}/players"
@@ -265,7 +266,7 @@ class APIManager:
         }
 
         try:
-            async with self.session.put(url=url, json=payload) as resp:
+            async with self.session.put(url=url, json=payload, auth=auth) as resp:
                 await resp.json()
                 return resp.ok
         except Exception as e:

@@ -46,9 +46,9 @@ class MatchCog(commands.Cog, name="Match"):
             pass
 
         try:
-            await api.stop_game_server(match_model.game_server_id)
+            await api.stop_game_server(match_model.game_server_id, auth=guild_model.dathost_auth)
             await asyncio.sleep(3)
-            await api.start_game_server(match_model.game_server_id)
+            await api.start_game_server(match_model.game_server_id, auth=guild_model.dathost_auth)
         except Exception as e:
             self.bot.logger.error(e, exc_info=True)
 
@@ -159,6 +159,7 @@ class MatchCog(commands.Cog, name="Match"):
             team2_captain = team2_users[0]
             team1_name = team1_captain.display_name
             team2_name = team2_captain.display_name
+            guild_model = await db.get_guild_by_id(guild.id, self.bot)
 
             match_players = [ {
                 'steam_id_64': u.steam,
@@ -176,7 +177,7 @@ class MatchCog(commands.Cog, name="Match"):
             await message.edit(embed=Embed(description='Searching for available game servers...'), view=None)
             await asyncio.sleep(2)
 
-            game_server = await self.find_match_server()
+            game_server = await self.find_match_server(guild_model.dathost_auth)
 
             await message.edit(embed=Embed(description='Setting up match on game server...'), view=None)
             await asyncio.sleep(2)
@@ -186,15 +187,17 @@ class MatchCog(commands.Cog, name="Match"):
                 if spec.member not in team1_users and spec.member not in team2_users:
                     match_players.append({'steam_id_64': spec.steam, 'team': 'spectator'})
 
+
             api_match = await api.create_match(
                 game_server.id,
                 map_name,
                 team1_name,
                 team2_name,
-                match_players
+                match_players,
+                auth=guild_model.dathost_auth
             )
 
-            await api.update_game_mode(game_server.id, game_mode)
+            await api.update_game_mode(game_server.id, game_mode, auth=guild_model.dathost_auth)
 
             await message.edit(embed=Embed(description='Setting up teams channels...'), view=None)
             category, team1_channel, team2_channel = await self.create_match_channels(
@@ -246,9 +249,9 @@ class MatchCog(commands.Cog, name="Match"):
         except:
             pass
 
-    async def find_match_server(self):
+    async def find_match_server(self, dathost_auth):
         """"""
-        game_servers = await api.get_game_servers()
+        game_servers = await api.get_game_servers(auth=dathost_auth)
 
         for game_server in game_servers:
             if not game_server.on:
@@ -300,7 +303,7 @@ class MatchCog(commands.Cog, name="Match"):
         """"""
         if not match_cancelled:
             try:
-                match_stats = await api.get_match(match_model.id)
+                match_stats = await api.get_match(match_model.id, auth=guild_model.dathost_auth)
                 try:
                     team1_stats = match_stats.team1_players
                     team2_stats = match_stats.team2_players
@@ -353,7 +356,7 @@ class MatchCog(commands.Cog, name="Match"):
             pass
 
         try:
-            api_match = await api.get_match(match_model.id)
+            api_match = await api.get_match(match_model.id, auth=guild_model.dathost_auth)
         except Exception as e:
             pass
 
@@ -362,7 +365,7 @@ class MatchCog(commands.Cog, name="Match"):
             return
 
         try:
-            game_server = await api.get_game_server(api_match.game_server_id)
+            game_server = await api.get_game_server(api_match.game_server_id, auth=guild_model.dathost_auth)
         except Exception as e:
             pass
 
