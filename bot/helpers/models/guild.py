@@ -26,7 +26,7 @@ class GuildModel:
         self.results_channel = results_channel
         self.leaderboard_channel = leaderboard_channel
         self.category = category
-        self.dathost_auth = BasicAuth(dathost_email, dathost_password)
+        self.dathost_auth = BasicAuth(dathost_email or "", dathost_password or "")
 
     @classmethod
     def from_dict(cls, data: dict, guild: discord.Guild) -> "GuildModel":

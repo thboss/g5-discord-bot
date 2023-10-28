@@ -109,7 +109,7 @@ class MatchCog(commands.Cog, name="Match"):
         game_server=None,
     ):
         """"""
-        title = f"Team **{match_stats.team1_name}**  [ {match_stats.team1_score} : {match_stats.team2_score} ]  Team **{match_stats.team2_name}**"
+        title = f"**{match_stats.team1_name}**  [ {match_stats.team1_score} : {match_stats.team2_score} ]  **{match_stats.team2_name}**"
         description = ''
 
         if game_server:
@@ -374,10 +374,10 @@ class MatchCog(commands.Cog, name="Match"):
                 embed = self.embed_match_info(api_match, game_server)
                 team1_users = await db.get_match_users(api_match.id, match_model.guild, team='team1')
                 team2_users = await db.get_match_users(api_match.id, match_model.guild, team='team2')
-                self.add_teams_fields(embed, api_match, team1_users, team2_users)
+                self.add_teams_fields(embed, team1_users, team2_users)
                 await message.edit(embed=embed)
             except Exception as e:
-                pass
+                self.bot.logger.error(e, exc_info=1)
 
         if not api_match.finished and not api_match.cancel_reason:
             return

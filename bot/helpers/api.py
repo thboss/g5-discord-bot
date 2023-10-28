@@ -121,56 +121,53 @@ class APIManager:
         self.logger.info('Closing API helper client session')
         await self.session.close()
 
+    async def check_auth(self, email, password):
+        """"""
+        url = "/api/0.1/account"
+        auth = aiohttp.BasicAuth(email, password)
+
+        async with self.session.get(url=url, auth=auth) as resp:
+            if resp.status == 401:
+                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+            return resp.ok
+
     async def get_game_server(self, game_server_id: str, auth: aiohttp.BasicAuth=None) -> List[GameServer]:
         """"""
         url = f"/api/0.1/game-servers/{game_server_id}"
 
-        try:
-            async with self.session.get(url=url, auth=auth) as resp:
-                resp_data = await resp.json()
-                if not resp.ok:
-                    raise ValueError(resp_data)
-                return GameServer.from_dict(resp_data)
-        except Exception as e:
-            self.logger.error(e, exc_info=1)
-            raise APIError
+        async with self.session.get(url=url, auth=auth) as resp:
+            if resp.status == 401:
+                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+            resp_data = await resp.json()
+            return GameServer.from_dict(resp_data)
         
-
     async def get_game_servers(self, auth: aiohttp.BasicAuth=None) -> List[GameServer]:
         """"""
         url = f"/api/0.1/game-servers"
 
-        try:
-            async with self.session.get(url=url, auth=auth) as resp:
-                resp_data = await resp.json()
-                return [GameServer.from_dict(game_server) for game_server in resp_data]
-        except Exception as e:
-            self.logger.error(e, exc_info=1)
-            raise APIError
+        async with self.session.get(url=url, auth=auth) as resp:
+            if resp.status == 401:
+                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+            resp_data = await resp.json()
+            return [GameServer.from_dict(game_server) for game_server in resp_data]
 
     async def stop_game_server(self, server_id: str, auth: aiohttp.BasicAuth=None):
         """"""
         url = f"/api/0.1/game-servers/{server_id}/stop"
 
-        try:
-            async with self.session.post(url=url, auth=auth) as resp:
-                await resp.json()
-                return resp.ok
-        except Exception as e:
-            self.logger.error(e, exc_info=1)
-            raise APIError
+        async with self.session.post(url=url, auth=auth) as resp:
+            if resp.status == 401:
+                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+            return resp.ok
         
     async def start_game_server(self, server_id: str, auth: aiohttp.BasicAuth=None):
         """"""
         url = f"/api/0.1/game-servers/{server_id}/start"
 
-        try:
-            async with self.session.post(url=url, auth=auth) as resp:
-                await resp.json()
-                return resp.ok
-        except Exception as e:
-            self.logger.error(e, exc_info=1)
-            raise APIError
+        async with self.session.post(url=url, auth=auth) as resp:
+            if resp.status == 401:
+                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+            return resp.ok
         
     async def update_game_mode(self, server_id: str, game_mode, auth: aiohttp.BasicAuth=None):
         """"""
@@ -179,13 +176,10 @@ class APIManager:
             "cs2_settings.game_mode": game_mode
         }
 
-        try:
-            async with self.session.put(url=url, data=payload, auth=auth) as resp:
-                await resp.json()
-                return resp.ok
-        except Exception as e:
-            self.logger.error(e, exc_info=1)
-            raise APIError
+        async with self.session.put(url=url, data=payload, auth=auth) as resp:
+            if resp.status == 401:
+                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+            return resp.ok
 
     async def send_rcon_to_game_server(self, server_id: str, cmd: str, auth: aiohttp.BasicAuth=None):
         """"""
@@ -194,27 +188,20 @@ class APIManager:
             'line': cmd
         }
 
-        try:
-            async with self.session.post(url=url, data=payload, auth=auth) as resp:
-                await resp.json()
-                return resp.ok
-        except Exception as e:
-            self.logger.error(e, exc_info=1)
-            raise APIError
+        async with self.session.post(url=url, data=payload, auth=auth) as resp:
+            if resp.status == 401:
+                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+            return resp.ok
 
     async def get_match(self, match_id: str, auth: aiohttp.BasicAuth=None) -> Optional["Match"]:
         """"""
         url = f"/api/0.1/cs2-matches/{match_id}"
 
-        try:
-            async with self.session.get(url=url, auth=auth) as resp:
-                resp_data = await resp.json()
-                if not resp.ok:
-                    return
-                return Match.from_dict(resp_data)
-        except Exception as e:
-            self.logger.error(e, exc_info=1)
-            raise APIError
+        async with self.session.get(url=url, auth=auth) as resp:
+            if resp.status == 401:
+                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+            resp_data = await resp.json()
+            return Match.from_dict(resp_data)
         
     async def create_match(
         self,
@@ -241,15 +228,11 @@ class APIManager:
             }
         }
 
-        try:
-            async with self.session.post(url=url, json=payload, auth=auth) as resp:
-                resp_data = await resp.json()
-                if not resp.ok:
-                    raise ValueError(resp_data)
-                return Match.from_dict(resp_data)
-        except Exception as e:
-            self.logger.error(e, exc_info=1)
-            raise APIError
+        async with self.session.post(url=url, json=payload, auth=auth) as resp:
+            if resp.status == 401:
+                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+            resp_data = await resp.json()
+            return Match.from_dict(resp_data)
 
     async def add_match_player(
         self,
@@ -265,13 +248,10 @@ class APIManager:
             'team': team,
         }
 
-        try:
-            async with self.session.put(url=url, json=payload, auth=auth) as resp:
-                await resp.json()
-                return resp.ok
-        except Exception as e:
-            self.logger.error(e, exc_info=1)
-            raise APIError
+        async with self.session.put(url=url, json=payload, auth=auth) as resp:
+            if resp.status == 401:
+                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+            return resp.ok
                 
 
 api = APIManager()
