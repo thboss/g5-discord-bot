@@ -103,21 +103,21 @@ def generate_statistics_img(stats):
         draw = ImageDraw.Draw(img)
         fontbig = ImageFont.truetype(FONTS_DIR + "/ARIALUNI.TTF", 36)
 
-        name = stats.member.display_name[:14]
+        name = stats.member.display_name[:20]
         name_box = draw.textbbox((0, 0), name, font=fontbig)
         name_width = name_box[2] - name_box[0]
 
-        draw.text(((width - name_width) // 2, 90), name, font=fontbig)
-        draw.text((57, 226+109*0), align_text(str(stats.kills), 14), font=font)
-        draw.text((57, 226+109*1), align_text(str(stats.deaths), 14), font=font)
-        draw.text((57, 226+109*2), align_text(str(stats.assists), 14), font=font)
-        draw.text((57, 226+109*3), align_text(str(stats.kdr), 14), font=font)
-        draw.text((57, 226+109*4), align_text(str(stats.headshots), 14), font=font)
-        draw.text((353, 226+109*0), align_text(str(stats.hsp), 20), font=font)
-        draw.text((353, 226+109*1), align_text(str(stats.played_matches), 20), font=font)
-        draw.text((353, 226+109*2), align_text(str(stats.wins), 20), font=font)
-        draw.text((353, 226+109*3), align_text(str(stats.win_percent), 20), font=font)
-        draw.text((353, 226+109*4), align_text(str(stats.elo), 20), font=font)
+        draw.text(((width - name_width) // 2, 32), name, font=fontbig)
+        draw.text((284, 97), str(stats.elo), font=fontbig, stroke_fill='white', stroke_width=1)
+        draw.text((65, 226+109*0), str(stats.kills), font=font)
+        draw.text((65, 226+109*1), str(stats.deaths), font=font)
+        draw.text((65, 226+109*2), str(stats.assists), font=font)
+        draw.text((65, 226+109*4), str(stats.headshots), font=font)
+        draw.text((65, 226+109*3), str(stats.hsp), font=font)
+        draw.text((372, 226+109*0), str(stats.kdr), font=font)
+        draw.text((372, 226+109*1), str(stats.played_matches), font=font)
+        draw.text((372, 226+109*2), str(stats.wins), font=font)
+        draw.text((372, 226+109*3), str(stats.win_percent), font=font)
 
         img.save(SAVE_IMG_DIR + '/statistics.png')
 
