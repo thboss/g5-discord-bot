@@ -34,6 +34,10 @@ class MatchCog(commands.Cog, name="Match"):
         if not match_model:
             raise CustomError("Invalid match ID.")
         
+        cancelled = await api.cancel_match(match_id, guild_model.dathost_auth)
+        if not cancelled:
+            raise CustomError("Something went wrong. Please try again later.")
+        
         await self.finalize_match(match_model, guild_model, match_cancelled=True)
 
         embed = Embed(description=f"Match #{match_id} cancelled successfully.")
@@ -44,13 +48,6 @@ class MatchCog(commands.Cog, name="Match"):
             await match_msg.delete()
         except:
             pass
-
-        try:
-            await api.stop_game_server(match_model.game_server_id, auth=guild_model.dathost_auth)
-            await asyncio.sleep(3)
-            await api.start_game_server(match_model.game_server_id, auth=guild_model.dathost_auth)
-        except Exception as e:
-            self.bot.logger.error(e, exc_info=True)
 
     async def pick_teams(self, message: Message, users: List[Member], captain_method: str):
         """"""

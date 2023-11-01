@@ -131,7 +131,7 @@ class APIManager:
                 raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
             return resp.ok
 
-    async def get_game_server(self, game_server_id: str, auth: aiohttp.BasicAuth=None) -> List[GameServer]:
+    async def get_game_server(self, game_server_id: str, auth: aiohttp.BasicAuth=None) -> "GameServer":
         """"""
         url = f"/api/0.1/game-servers/{game_server_id}"
 
@@ -149,25 +149,7 @@ class APIManager:
             if resp.status == 401:
                 raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
             resp_data = await resp.json()
-            return [GameServer.from_dict(game_server) for game_server in resp_data]
-
-    async def stop_game_server(self, server_id: str, auth: aiohttp.BasicAuth=None):
-        """"""
-        url = f"/api/0.1/game-servers/{server_id}/stop"
-
-        async with self.session.post(url=url, auth=auth) as resp:
-            if resp.status == 401:
-                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
-            return resp.ok
-        
-    async def start_game_server(self, server_id: str, auth: aiohttp.BasicAuth=None):
-        """"""
-        url = f"/api/0.1/game-servers/{server_id}/start"
-
-        async with self.session.post(url=url, auth=auth) as resp:
-            if resp.status == 401:
-                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
-            return resp.ok
+            return [GameServer.from_dict(game_server) for game_server in resp_data if game_server['game'] == 'cs2']
         
     async def update_game_mode(self, server_id: str, game_mode, auth: aiohttp.BasicAuth=None):
         """"""
@@ -253,5 +235,14 @@ class APIManager:
                 raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
             return resp.ok
                 
+    async def cancel_match(self, match_id: int, auth: aiohttp.BasicAuth=None):
+        """"""
+        url = f"/api/0.1/cs2-matches/{match_id}/cancel"
+
+        async with self.session.post(url=url, auth=auth) as resp:
+            if resp.status == 401:
+                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+            return resp.ok
+        
 
 api = APIManager()
