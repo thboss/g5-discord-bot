@@ -16,7 +16,8 @@ class MatchModel:
         category: Optional[discord.CategoryChannel],
         team1_channel: Optional[discord.VoiceChannel],
         team2_channel: Optional[discord.VoiceChannel],
-        game_server_id: str
+        game_server_id: str,
+        api_key
     ):
         """"""
         self.id = match_id
@@ -27,6 +28,7 @@ class MatchModel:
         self.team1_channel = team1_channel
         self.team2_channel = team2_channel
         self.game_server_id = game_server_id
+        self.api_key = api_key
 
     @classmethod
     def from_dict(cls, data: dict, guild: discord.Guild) -> "MatchModel":
@@ -39,5 +41,6 @@ class MatchModel:
             guild.get_channel(data['category']),
             guild.get_channel(data['team1_channel']),
             guild.get_channel(data['team2_channel']),
-            data['game_server_id']
+            data['game_server_id'],
+            data['api_key']
         )

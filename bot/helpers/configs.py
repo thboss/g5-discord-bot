@@ -21,6 +21,8 @@ class Config:
     maps = config['bot']['maps']
     dathost_email = config['dathost']['email']
     dathost_password = config['dathost']['password']
+    webserver_host = config['webserver']['host']
+    webserver_port = config['webserver']['port']
     POSTGRESQL_USER = config['db']['user']
     POSTGRESQL_PASSWORD = config['db']['password']
     POSTGRESQL_DB = config['db']['database']

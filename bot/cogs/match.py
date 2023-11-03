@@ -9,7 +9,7 @@ import asyncio
 
 from bot.helpers.api import api, Match
 from bot.helpers.db import db
-from bot.helpers.utils import generate_scoreboard_img
+from bot.helpers.utils import generate_api_key, generate_scoreboard_img
 from bot.helpers.models import GuildModel, MatchModel
 from bot.bot import G5Bot
 from bot.helpers.errors import APIError, CustomError
@@ -184,6 +184,7 @@ class MatchCog(commands.Cog, name="Match"):
                 if spec.member not in team1_users and spec.member not in team2_users:
                     match_players.append({'steam_id_64': spec.steam, 'team': 'spectator'})
 
+            api_key = generate_api_key()
 
             api_match = await api.create_match(
                 game_server.id,
@@ -191,7 +192,8 @@ class MatchCog(commands.Cog, name="Match"):
                 team1_name,
                 team2_name,
                 match_players,
-                auth=guild_model.dathost_auth
+                api_key,
+                auth=guild_model.dathost_auth,
             )
 
             await api.update_game_mode(game_server.id, game_mode, auth=guild_model.dathost_auth)
@@ -212,7 +214,8 @@ class MatchCog(commands.Cog, name="Match"):
                 'message': message.id,
                 'category': category.id,
                 'team1_channel': team1_channel.id,
-                'team2_channel': team2_channel.id
+                'team2_channel': team2_channel.id,
+                'api_key': api_key
             })
 
             await db.insert_match_users(api_match.id, team1_users + team2_users)
@@ -233,9 +236,6 @@ class MatchCog(commands.Cog, name="Match"):
                 await message.edit(embed=embed, view=None)
             except:
                 pass
-
-            if not self.check_live_matches.is_running():
-                self.check_live_matches.start()
 
             return True
 
@@ -340,26 +340,15 @@ class MatchCog(commands.Cog, name="Match"):
 
         await db.delete_match(match_model.id)
 
-    async def update_match_stats(self, match_model: MatchModel):
+    async def update_match_stats(self, match_model: MatchModel, guild_model: GuildModel, api_match: Match):
         """"""
-        api_match = None
         game_server = None
         message = None
-        guild_model = await db.get_guild_by_id(match_model.guild.id, self.bot)
 
         try:
             message = await match_model.text_channel.fetch_message(match_model.message_id)
         except Exception as e:
             pass
-
-        try:
-            api_match = await api.get_match(match_model.id, auth=guild_model.dathost_auth)
-        except Exception as e:
-            pass
-
-        if not api_match:
-            await self.finalize_match(match_model, guild_model, match_cancelled=True)
-            return
 
         try:
             game_server = await api.get_game_server(api_match.game_server_id, auth=guild_model.dathost_auth)
@@ -385,24 +374,6 @@ class MatchCog(commands.Cog, name="Match"):
             pass
 
         await self.finalize_match(match_model, guild_model, match_cancelled=api_match.cancel_reason is not None)
-
-    @ tasks.loop(seconds=20.0)
-    async def check_live_matches(self):
-        """"""
-        live_match = False
-        for guild in self.bot.guilds:
-            guild_matches = await db.get_guild_matches(guild)
-            if guild_matches:
-                live_match = True
-                aws = [self.update_match_stats(m) for m in guild_matches]
-                results = await asyncio.gather(*aws, return_exceptions=True)
-                for e in results:
-                    if isinstance(e, Exception):
-                        self.bot.log_exception(
-                            f'Uncaught exception when handling cogs.match.update_match_stats():', e)
-
-        if not live_match:
-            self.check_live_matches.cancel()
 
 
 async def setup(bot):

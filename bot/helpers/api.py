@@ -191,7 +191,8 @@ class APIManager:
         map_name: str,
         team1_name: str,
         team2_name: str,
-        players: List[dict],
+        match_players: List[dict],
+        api_key: str,
         auth: aiohttp.BasicAuth=None
     ) -> Match:
         """"""
@@ -202,11 +203,16 @@ class APIManager:
             'game_server_id': game_server_id,
             'team1': { 'name': 'team_' + team1_name },
             'team2': { 'name': 'team_' + team2_name },
-            'players': players,
+            'players': match_players,
             'settings': {
                 'map': map_name,
                 'connect_time': 300,
                 'match_begin_countdown': 15
+            },
+            'webhooks': {
+                'match_end_url': f'http://{Config.webserver_host}:{Config.webserver_port}/cs2bot-api/match-end',
+                'round_end_url': f'http://{Config.webserver_host}:{Config.webserver_port}/cs2bot-api/round-end',
+                'authorization_header': api_key
             }
         }
 

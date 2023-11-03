@@ -1,12 +1,15 @@
 # bot.py
 
 
+import asyncio
 import logging
 import os
 import traceback
 
 from discord.ext import commands
 from discord import app_commands, Interaction, Embed, Guild, TextChannel
+
+from bot.helpers.webhook import WebServer
 
 from .helpers.db import db
 from .helpers.api import api
@@ -76,6 +79,9 @@ class G5Bot(commands.AutoShardedBot):
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
+        web_server = WebServer(self)
+        await web_server.start_webhook_server()
+
         #  Sync guilds' information with the database.
         if self.guilds:
             await db.sync_guilds([g.id for g in self.guilds])
@@ -83,11 +89,6 @@ class G5Bot(commands.AutoShardedBot):
                 try:
                     await self.check_guild_requirements(guild)
                 except: pass
-
-        match_cog = self.get_cog("Match")
-        if match_cog:
-            if not match_cog.check_live_matches.is_running():
-                match_cog.check_live_matches.start()
 
         stats_cog = self.get_cog('Stats')
         if not stats_cog.update_leaderboard.is_running():

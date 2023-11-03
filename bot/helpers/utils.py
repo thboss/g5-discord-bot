@@ -1,3 +1,5 @@
+import secrets
+import string
 from steam.steamid import SteamID, from_url
 from PIL import Image, ImageFont, ImageDraw
 from discord import File
@@ -93,6 +95,12 @@ def calculate_elo(stats, old_elo=1000):
         stats.deaths)
     
     return new_elo
+
+
+def generate_api_key(length=32):
+    alphabet = string.ascii_letters + string.digits
+    api_key = ''.join(secrets.choice(alphabet) for _ in range(length))
+    return api_key.upper()
 
 
 def generate_statistics_img(stats):

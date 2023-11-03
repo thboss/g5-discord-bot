@@ -66,6 +66,16 @@ class DBManager:
             if guild:
                 return MatchModel.from_dict(data[0], guild)
 
+    async def get_match_by_api_key(self, api_key: str, bot) -> Optional["MatchModel"]:
+        """"""
+        sql = "SELECT * FROM matches\n" \
+            f"    WHERE api_key = $1;"
+        data = await self.query(sql, api_key)
+        if data:
+            guild = bot.get_guild(data[0]['guild'])
+            if guild:
+                return MatchModel.from_dict(data[0], guild)
+
     async def get_guild_matches(self, guild: discord.Guild) -> List["MatchModel"]:
         """"""
 
