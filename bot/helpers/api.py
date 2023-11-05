@@ -162,15 +162,12 @@ class APIManager:
             if resp.status == 401:
                 raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
             return resp.ok
-
-    async def send_rcon_to_game_server(self, server_id: str, cmd: str, auth: aiohttp.BasicAuth=None):
+        
+    async def stop_game_server(self, server_id: str, auth: aiohttp.BasicAuth=None):
         """"""
-        url = f"/api/0.1/game-servers/{server_id}/console"
-        payload = {
-            'line': cmd
-        }
+        url = f"/api/0.1/game-servers/{server_id}/stop"
 
-        async with self.session.post(url=url, data=payload, auth=auth) as resp:
+        async with self.session.post(url=url, auth=auth) as resp:
             if resp.status == 401:
                 raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
             return resp.ok

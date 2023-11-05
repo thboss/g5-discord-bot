@@ -34,11 +34,17 @@ class MatchCog(commands.Cog, name="Match"):
         if not match_model:
             raise CustomError("Invalid match ID.")
         
-        cancelled = await api.cancel_match(match_id, guild_model.dathost_auth)
-        if not cancelled:
-            raise CustomError("Something went wrong. Please try again later.")
+        try:
+            await api.cancel_match(match_id, guild_model.dathost_auth)
+        except:
+            pass
+
+        try:
+            await api.stop_game_server(match_model.game_server_id, guild_model.dathost_auth)
+        except:
+            pass
         
-        await self.finalize_match(match_model, guild_model, match_cancelled=True)
+        await self.finalize_match(match_model, guild_model)
 
         embed = Embed(description=f"Match #{match_id} cancelled successfully.")
         await interaction.followup.send(embed=embed)
@@ -174,7 +180,7 @@ class MatchCog(commands.Cog, name="Match"):
             await message.edit(embed=Embed(description='Searching for available game servers...'), view=None)
             await asyncio.sleep(2)
 
-            game_server = await self.find_match_server(guild_model.dathost_auth)
+            game_server = await self.find_game_server(guild_model.dathost_auth)
 
             await message.edit(embed=Embed(description='Setting up match on game server...'), view=None)
             await asyncio.sleep(2)
@@ -246,18 +252,15 @@ class MatchCog(commands.Cog, name="Match"):
         except:
             pass
 
-    async def find_match_server(self, dathost_auth):
+    async def find_game_server(self, dathost_auth):
         """"""
         game_servers = await api.get_game_servers(auth=dathost_auth)
 
-        for game_server in game_servers:
-            if not game_server.on:
-                continue
-            
+        for game_server in game_servers:            
             if not await db.is_server_in_use(game_server.id):
                 return game_server
 
-        raise ValueError("No game server available.")
+        raise ValueError("No game server available at the moment.")
 
     async def create_match_channels(
         self,
@@ -296,84 +299,25 @@ class MatchCog(commands.Cog, name="Match"):
 
         return match_catg, team1_channel, team2_channel
 
-    async def finalize_match(self, match_model: MatchModel, guild_model: GuildModel, match_cancelled=False):
+    async def finalize_match(self, match_model: MatchModel, guild_model: GuildModel):
         """"""
-        if not match_cancelled:
-            try:
-                match_stats = await api.get_match(match_model.id, auth=guild_model.dathost_auth)
-                try:
-                    team1_stats = match_stats.team1_players
-                    team2_stats = match_stats.team2_players
-                    for p in team1_stats:
-                        user_model = await db.get_user_by_steam_id(p.steam_id, self.bot)
-                        p.member = user_model.member
-                    for p in team2_stats:
-                        user_model = await db.get_user_by_steam_id(p.steam_id, self.bot)
-                        p.member = user_model.member
-                    team1_stats.sort(key=lambda x: x.score, reverse=True)
-                    team2_stats.sort(key=lambda x: x.score, reverse=True)
-                    file = generate_scoreboard_img(match_stats, team1_stats[:6], team2_stats[:6])
-                    await guild_model.results_channel.send(file=file)
-                except Exception as e:
-                    self.bot.logger.error(e, exc_info=1)
-
-                for player_stat in match_stats.team1_players + match_stats.team2_players:
-                    try:
-                        user_model = await db.get_user_by_steam_id(player_stat.steam_id, self.bot)
-                        await db.update_user_stats(user_model.member.id, player_stat)
-                    except Exception as e:
-                        self.bot.logger.error(e, exc_info=1)
-
-            except Exception as e:
-                self.bot.logger.error(e, exc_info=1)
-
         match_players = await db.get_match_users(match_model.id, match_model.guild)
         move_aws = [user.move_to(guild_model.waiting_channel) for user in match_players]
         await asyncio.gather(*move_aws, return_exceptions=True)
         
-        try:
-            await match_model.team1_channel.delete()
-            await match_model.team2_channel.delete()
-            await match_model.category.delete()
-        except Exception as e:
-            pass
+        team_channels = [
+            match_model.team2_channel,
+            match_model.team1_channel,
+            match_model.category
+        ]
+
+        for channel in team_channels:
+            try:
+                await channel.delete()
+            except:
+                pass
 
         await db.delete_match(match_model.id)
-
-    async def update_match_stats(self, match_model: MatchModel, guild_model: GuildModel, api_match: Match):
-        """"""
-        game_server = None
-        message = None
-
-        try:
-            message = await match_model.text_channel.fetch_message(match_model.message_id)
-        except Exception as e:
-            pass
-
-        try:
-            game_server = await api.get_game_server(api_match.game_server_id, auth=guild_model.dathost_auth)
-        except Exception as e:
-            pass
-
-        if message:
-            try:
-                embed = self.embed_match_info(api_match, game_server)
-                team1_users = await db.get_match_users(api_match.id, match_model.guild, team='team1')
-                team2_users = await db.get_match_users(api_match.id, match_model.guild, team='team2')
-                self.add_teams_fields(embed, team1_users, team2_users)
-                await message.edit(embed=embed)
-            except Exception as e:
-                self.bot.logger.error(e, exc_info=1)
-
-        if not api_match.finished and not api_match.cancel_reason:
-            return
-
-        try:
-            await message.delete()
-        except Exception as e:
-            pass
-
-        await self.finalize_match(match_model, guild_model, match_cancelled=api_match.cancel_reason is not None)
 
 
 async def setup(bot):
