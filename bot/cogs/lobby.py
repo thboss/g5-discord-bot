@@ -47,6 +47,14 @@ GAME_MODE_CHOICES = [
     app_commands.Choice(name="Wingman", value="wingman"),
 ]
 
+CONNECT_TIME_CHOICES = [
+    app_commands.Choice(name="1 minute", value=60),
+    app_commands.Choice(name="2 minute", value=120),
+    app_commands.Choice(name="3 minute", value=180),
+    app_commands.Choice(name="5 minute", value=300),
+    app_commands.Choice(name="10 minute", value=600)
+]
+
 
 class LobbyCog(commands.Cog, name="Lobby"):
     """"""
@@ -64,14 +72,16 @@ class LobbyCog(commands.Cog, name="Lobby"):
         capacity="Capacity of the lobby",
         teams_method="Teams selection method",
         captains_method="Captains selection method",
-        map_method="Map selection method"
+        map_method="Map selection method",
+        connect_time="Time in seconds until match is canceled if not everyone has joined"
     )
     @app_commands.choices(
         capacity=CAPACITY_CHOICES,
         teams_method=TEAM_SELECTION_CHOICES,
         captains_method=CAPTAIN_SELECTION_CHOICES,
         map_method=MAP_SELECTION_CHOICES,
-        game_mode=GAME_MODE_CHOICES
+        game_mode=GAME_MODE_CHOICES,
+        connect_time=CONNECT_TIME_CHOICES
     )
     @app_commands.checks.has_permissions(administrator=True)
     async def create_lobby(
@@ -79,9 +89,10 @@ class LobbyCog(commands.Cog, name="Lobby"):
         interaction: Interaction,
         capacity: app_commands.Choice[int],
         game_mode: app_commands.Choice[str],
+        connect_time: app_commands.Choice[int],
         teams_method: app_commands.Choice[str],
         captains_method: app_commands.Choice[str],
-        map_method: app_commands.Choice[str],
+        map_method: app_commands.Choice[str]
     ):
         """ Create a new lobby. """
         await interaction.response.defer(ephemeral=True)
@@ -104,13 +115,14 @@ class LobbyCog(commands.Cog, name="Lobby"):
         lobby_data = {
             'guild': guild.id,
             'capacity': capacity.value,
+            'game_mode': game_mode.value,
+            'connect_time': connect_time.value,
             'team_method': teams_method.value,
             'captain_method': captains_method.value,
             'map_method': map_method.value,
             'category': category.id,
             'queue_channel': text_channel.id,
-            'lobby_channel': voice_channel.id,
-            'game_mode': game_mode.value
+            'lobby_channel': voice_channel.id
         }
 
         lobby_id = await db.insert_lobby(lobby_data)
@@ -365,7 +377,8 @@ class LobbyCog(commands.Cog, name="Lobby"):
                         team_method=lobby_model.team_method,
                         captain_method=lobby_model.captain_method,
                         map_method=lobby_model.map_method,
-                        game_mode=lobby_model.game_mode
+                        game_mode=lobby_model.game_mode,
+                        connect_time=lobby_model.connect_time
                     )
                     if not match_started:
                         awaitables = [u.move_to(guild_model.waiting_channel) for u in queued_users]

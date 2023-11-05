@@ -16,6 +16,7 @@ class WebServer:
         self.match_cog = bot.get_cog("Match")
 
     async def match_end(self, req):
+        self.logger.info(f"Received webhook data from {req.url}")
         message = None
         api_key = req.headers.get('Authorization').strip('Bearer ')
         match_model = await db.get_match_by_api_key(api_key, self.bot)
@@ -45,9 +46,9 @@ class WebServer:
 
         await self.match_cog.finalize_match(match_model, guild_model)
 
-        self.logger.info(f"Received webhook data from {req.url}")
 
     async def round_end(self, req):
+        self.logger.debug(f"Received webhook data from {req.url}")
         game_server = None
         message = None
         authorization = req.headers.get('Authorization').strip('Bearer ')
@@ -79,7 +80,6 @@ class WebServer:
             except Exception as e:
                 self.logger.error(e, exc_info=1)
 
-        self.logger.debug(f"Received webhook data from {req.url}")
 
     async def _update_players_stats(self, team1_stats, team2_stats):
         for player_stat in team1_stats + team2_stats:

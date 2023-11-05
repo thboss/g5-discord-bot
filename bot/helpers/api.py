@@ -189,6 +189,7 @@ class APIManager:
         team1_name: str,
         team2_name: str,
         match_players: List[dict],
+        connect_time,
         api_key: str,
         auth: aiohttp.BasicAuth=None
     ) -> Match:
@@ -203,7 +204,7 @@ class APIManager:
             'players': match_players,
             'settings': {
                 'map': map_name,
-                'connect_time': 300,
+                'connect_time': connect_time,
                 'match_begin_countdown': 15
             },
             'webhooks': {

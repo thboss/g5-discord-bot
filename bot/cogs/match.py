@@ -144,7 +144,8 @@ class MatchCog(commands.Cog, name="Match"):
         team_method: str='captains',
         map_method: str='veto',
         captain_method: str='random',
-        game_mode: str='competitive'
+        game_mode: str='competitive',
+        connect_time: int=300
     ):
         """"""
         await asyncio.sleep(3)
@@ -198,6 +199,7 @@ class MatchCog(commands.Cog, name="Match"):
                 team1_name,
                 team2_name,
                 match_players,
+                connect_time,
                 api_key,
                 auth=guild_model.dathost_auth,
             )
