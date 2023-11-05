@@ -30,41 +30,18 @@ class WebServer:
 
         resp_data = await req.json()
         match_api = Match.from_dict(resp_data)
+        team1_stats = match_api.team1_players
+        team2_stats = match_api.team2_players
 
         try:
             message = await match_model.text_channel.fetch_message(match_model.message_id)
             await message.delete()
         except:
             pass
-
-
-        team1_stats = match_api.team1_players
-        team2_stats = match_api.team2_players
         
-        # Release match stats
-        try:
-            for p in team1_stats:
-                user_model = await db.get_user_by_steam_id(p.steam_id, self.bot)
-                p.member = user_model.member
-            for p in team2_stats:
-                user_model = await db.get_user_by_steam_id(p.steam_id, self.bot)
-                p.member = user_model.member
-            team1_stats.sort(key=lambda x: x.score, reverse=True)
-            team2_stats.sort(key=lambda x: x.score, reverse=True)
-            file = generate_scoreboard_img(match_api, team1_stats[:6], team2_stats[:6])
-            await guild_model.results_channel.send(file=file)
-        except Exception as e:
-            self.logger.error(e, exc_info=1)
-
         if not match_api.cancel_reason:
-            # Update players stats
-            for player_stat in team1_stats + team2_stats:
-                try:
-                    user_model = await db.get_user_by_steam_id(player_stat.steam_id, self.bot)
-                    if user_model:
-                        await db.update_user_stats(user_model.member.id, player_stat)
-                except Exception as e:
-                    self.logger.error(e, exc_info=1)
+            await self._release_match_stats(guild_model, match_api, team1_stats, team2_stats)
+            await self._update_players_stats(team1_stats, team2_stats)
 
         await self.match_cog.finalize_match(match_model, guild_model)
 
@@ -103,6 +80,30 @@ class WebServer:
                 self.logger.error(e, exc_info=1)
 
         self.logger.debug(f"Received webhook data from {req.url}")
+
+    async def _update_players_stats(self, team1_stats, team2_stats):
+        for player_stat in team1_stats + team2_stats:
+            try:
+                user_model = await db.get_user_by_steam_id(player_stat.steam_id, self.bot)
+                if user_model:
+                    await db.update_user_stats(user_model.member.id, player_stat)
+            except Exception as e:
+                self.logger.error(e, exc_info=1)
+
+    async def _release_match_stats(self, guild_model, match_api, team1_stats, team2_stats):
+        try:
+            for p in team1_stats:
+                user_model = await db.get_user_by_steam_id(p.steam_id, self.bot)
+                p.member = user_model.member
+            for p in team2_stats:
+                user_model = await db.get_user_by_steam_id(p.steam_id, self.bot)
+                p.member = user_model.member
+            team1_stats.sort(key=lambda x: x.score, reverse=True)
+            team2_stats.sort(key=lambda x: x.score, reverse=True)
+            file = generate_scoreboard_img(match_api, team1_stats[:6], team2_stats[:6])
+            await guild_model.results_channel.send(file=file)
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
 
     async def start_webhook_server(self):
         self.logger.info(f'Starting webhook server on {self.host}:{self.port}')
