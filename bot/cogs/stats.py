@@ -2,12 +2,12 @@
 
 from typing import Optional
 
-from discord.ext import commands, tasks
+from discord.ext import commands
 from discord import app_commands, Interaction, Member, Embed
 from bot.helpers.db import db
 from bot.helpers.errors import CustomError
 from bot.views import ConfirmView
-from bot.helpers.utils import generate_statistics_img, generate_leaderboard_img
+from bot.helpers.utils import generate_statistics_img
 
 
 class StatsCog(commands.Cog, name='Stats'):
@@ -59,34 +59,6 @@ class StatsCog(commands.Cog, name='Stats'):
             self.bot.logger.error(e, exc_info=1)
         
         await interaction.edit_original_response(embed=embed, view=None)
-
-    @tasks.loop(minutes=10.0)
-    async def update_leaderboard(self):
-        """"""
-        for guild in self.bot.guilds:
-            guild_model = await db.get_guild_by_id(guild.id, self.bot)
-
-            leaderboard_channel = guild_model.leaderboard_channel
-            if not leaderboard_channel:
-                continue
-
-            try:
-                await leaderboard_channel.purge()
-            except:
-                pass
-            
-            try:
-                leaderboard = await db.get_users(guild.members)
-                leaderboard.sort(key=lambda u: u.elo, reverse=True)
-                leaderboard = list(filter(lambda u: u.played_matches != 0, leaderboard))
-                if leaderboard:
-                    try:
-                        file = generate_leaderboard_img(leaderboard[:10])
-                        await leaderboard_channel.send(file=file)
-                    except Exception as e:
-                        self.bot.logger.error(e, exc_info=1)
-            except:
-                pass
 
 
 async def setup(bot):

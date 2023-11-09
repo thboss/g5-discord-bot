@@ -85,10 +85,6 @@ class G5Bot(commands.AutoShardedBot):
                     await self.check_guild_requirements(guild)
                 except: pass
 
-        stats_cog = self.get_cog('Stats')
-        if not stats_cog.update_leaderboard.is_running():
-            stats_cog.update_leaderboard.start()
-
         # Sync slash commands
         guild = self.get_guild(Config.guild_id)
         if guild:

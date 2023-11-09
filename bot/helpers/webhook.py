@@ -4,7 +4,7 @@ from bot.helpers.api import api, Match
 from bot.helpers.configs import Config
 
 from bot.helpers.db import db
-from bot.helpers.utils import generate_scoreboard_img
+from bot.helpers.utils import generate_leaderboard_img, generate_scoreboard_img
 
 
 class WebServer:
@@ -17,7 +17,6 @@ class WebServer:
 
     async def match_end(self, req):
         self.logger.info(f"Received webhook data from {req.url}")
-        message = None
         api_key = req.headers.get('Authorization').strip('Bearer ')
         match_model = await db.get_match_by_api_key(api_key, self.bot)
         guild_model = await db.get_guild_by_id(match_model.guild.id, self.bot)
@@ -43,6 +42,7 @@ class WebServer:
         if not match_api.cancel_reason:
             await self._release_match_stats(guild_model, match_api, team1_stats, team2_stats)
             await self._update_players_stats(team1_stats, team2_stats)
+            await self._update_leaderboard(guild_model)
 
         await self.match_cog.finalize_match(match_model, guild_model)
 
@@ -80,6 +80,30 @@ class WebServer:
             except Exception as e:
                 self.logger.error(e, exc_info=1)
 
+
+    async def _update_leaderboard(self, guild_model):
+        """"""
+        leaderboard_channel = guild_model.leaderboard_channel
+        if not leaderboard_channel:
+            return
+
+        try:
+            await leaderboard_channel.purge()
+        except:
+            pass
+        
+        try:
+            leaderboard = await db.get_users(guild_model.guild.members)
+            leaderboard.sort(key=lambda u: u.elo, reverse=True)
+            leaderboard = list(filter(lambda u: u.played_matches != 0, leaderboard))
+            if leaderboard:
+                try:
+                    file = generate_leaderboard_img(leaderboard[:10])
+                    await leaderboard_channel.send(file=file)
+                except Exception as e:
+                    self.bot.logger.error(e, exc_info=1)
+        except:
+            pass
 
     async def _update_players_stats(self, team1_stats, team2_stats):
         for player_stat in team1_stats + team2_stats:
