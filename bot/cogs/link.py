@@ -23,13 +23,9 @@ class LinkCog(commands.Cog, name='Link'):
         user_model = await db.get_user_by_discord_id(user.id, self.bot)
 
         if user_model:
-            all_commands = await self.bot.tree.fetch_commands()
-            change_command = None
-            for c in all_commands:
-                if c.name == "change-steam":
-                    change_command = c
+            change_command = await self._get_slash_command("change-steam")
             raise CustomError(
-                f"**You are already linked to [Steam](https://steamcommunity.com/profiles/{user_model.steam}/)**\n" \
+                f"**You already linked to [Steam](https://steamcommunity.com/profiles/{user_model.steam}/)**\n" \
                 f"Use {change_command.mention} if you want to link to different Steam.")
 
         try:
@@ -61,18 +57,14 @@ class LinkCog(commands.Cog, name='Link'):
         user_model = await db.get_user_by_discord_id(user.id, self.bot)
 
         if not user_model:
-            all_commands = await self.bot.tree.fetch_commands()
-            link_command = None
-            for c in all_commands:
-                if c.name == "link-steam":
-                    link_command = c
+            link_command = await self._get_slash_command("link-steam")
             raise CustomError("Your account is not linked to Steam.\n" \
                               f"Please use {link_command.mention} to link your account.")
 
         user_match = await db.get_user_match(user.id, interaction.guild)
         if user_match:
             raise CustomError(
-                f"You can't change your steam while you are in match #{user_match.id}")
+                f"You can't change your steam while you belong to a live match #{user_match.id}")
         
         spectators = await db.get_spectators(interaction.guild)
         for spec in spectators:
@@ -80,7 +72,6 @@ class LinkCog(commands.Cog, name='Link'):
                 raise CustomError(
                     "You can't change your steam while you are in spectators list.")
             
-
         try:
             await db.update_user(user.id, {'steam_id': f"'{steam_id}'"})
         except UniqueViolationError:
@@ -96,6 +87,12 @@ class LinkCog(commands.Cog, name='Link'):
         embed = Embed(
             description=f"You have successfully updated your [Steam](https://steamcommunity.com/profiles/{steam_id}/)")
         await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _get_slash_command(self, target_command_name: str):
+        all_commands = await self.bot.tree.fetch_commands()
+        for c in all_commands:
+            if c.name == target_command_name:
+                return c
 
 
 async def setup(bot):

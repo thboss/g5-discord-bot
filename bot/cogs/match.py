@@ -145,7 +145,8 @@ class MatchCog(commands.Cog, name="Match"):
         map_method: str='veto',
         captain_method: str='random',
         game_mode: str='competitive',
-        connect_time: int=300
+        connect_time: int=300,
+        location: str=None
     ):
         """"""
         await asyncio.sleep(3)
@@ -191,8 +192,10 @@ class MatchCog(commands.Cog, name="Match"):
                 if spec.member not in team1_users and spec.member not in team2_users:
                     match_players.append({'steam_id_64': spec.steam, 'team': 'spectator'})
 
-            api_key = generate_api_key()
+            # TODO
+            await api.update_game_server(game_server.id, game_mode=game_mode, location=location, auth=guild_model.dathost_auth)
 
+            api_key = generate_api_key()
             api_match = await api.create_match(
                 game_server.id,
                 map_name,
@@ -203,8 +206,6 @@ class MatchCog(commands.Cog, name="Match"):
                 api_key,
                 auth=guild_model.dathost_auth,
             )
-
-            await api.update_game_mode(game_server.id, game_mode, auth=guild_model.dathost_auth)
 
             await message.edit(embed=Embed(description='Setting up teams channels...'), view=None)
             category, team1_channel, team2_channel = await self.create_match_channels(

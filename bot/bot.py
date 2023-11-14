@@ -7,7 +7,7 @@ import os
 import traceback
 
 from discord.ext import commands
-from discord import app_commands, Interaction, Embed, Guild, TextChannel
+from discord import app_commands, Interaction, Embed, Guild, errors
 
 from bot.helpers.webhook import WebServer
 
@@ -45,7 +45,7 @@ class G5Bot(commands.AutoShardedBot):
             description = "You are missing the permission(s) `" \
                 + ", ".join(error.missing_permissions) \
                 + "` to execute this command!"
-        elif isinstance(error, app_commands.BotMissingPermissions):
+        elif isinstance(error, (app_commands.BotMissingPermissions, errors.Forbidden)):
             description = "I am missing the permission(s) `" \
                 + ", ".join(error.missing_permissions) \
                 + "` to fully perform this command!"
