@@ -152,14 +152,16 @@ class APIManager:
             return [GameServer.from_dict(game_server) for game_server in resp_data if game_server['game'] == 'cs2']
         
     async def update_game_server(
-        self, server_id: str,
+        self,
+        server_id: str,
+        slots: int,
         game_mode: Literal["competitive", "wingman"]=None,
         location: str=None,
         auth: aiohttp.BasicAuth=None
     ):
         """"""
         url = f"/api/0.1/game-servers/{server_id}"
-        payload = {}
+        payload = {"cs2_settings.slots": slots}
         if game_mode: payload["cs2_settings.game_mode"] = game_mode
         if location: payload["location"] = location
 

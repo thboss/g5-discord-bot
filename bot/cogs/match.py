@@ -192,8 +192,12 @@ class MatchCog(commands.Cog, name="Match"):
                 if spec.member not in team1_users and spec.member not in team2_users:
                     match_players.append({'steam_id_64': spec.steam, 'team': 'spectator'})
 
-            # TODO
-            await api.update_game_server(game_server.id, game_mode=game_mode, location=location, auth=guild_model.dathost_auth)
+            await api.update_game_server(
+                game_server.id,
+                len(match_players),
+                game_mode=game_mode,
+                location=location,
+                auth=guild_model.dathost_auth)
 
             api_key = generate_api_key()
             api_match = await api.create_match(
