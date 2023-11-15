@@ -36,6 +36,35 @@ COUNTRY_FLAGS = [
 ]
 
 
+GAME_SERVER_LOCATIONS = {
+    "beauharnois": "Canada",
+    "new_york_city": "USA - NY",
+    "los_angeles": "USA - CA",
+    "miami": "USA - FL",
+    "chicago": "USA - IL",
+    "portland": "USA - WA",
+    "dallas": "USA - TX",
+    "copenhagen": "Denmark",
+    "helsinki": "Finland",
+    "strasbourg": "France",
+    "dusseldorf": "Germany",
+    "amsterdam": "Netherlands",
+    "warsaw": "Poland",
+    "moscow": "Russia",
+    "barcelona": "Spain",
+    "stockholm": "Sweden",
+    "istanbul": "Turkey",
+    "bristol": "United Kingdom",
+    "sydney": "Australia",
+    "sao_paulo": "Brazil",
+    "hong_kong": "Hong Kong",
+    "mumbai": "India",
+    "tokyo": "Japan",
+    "singapore": "Singapore",
+    "johannesburg": "South Africa"
+}
+
+
 def validate_steam(steam: str) -> int:
     try:
         steam_id = SteamID(steam)

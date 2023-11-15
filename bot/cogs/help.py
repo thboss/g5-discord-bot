@@ -15,7 +15,14 @@ class Help(commands.Cog):
     async def help(self, interaction: discord.Interaction):
         """"""
         await interaction.response.defer(ephemeral=True)
-        pages = []
+        bot_info = await self.bot.application_info()
+        pages = [{
+            'label': 'Info',
+            'content': discord.Embed(
+                title="Info",
+                description=f"Bot is under development, please contact the owner **{bot_info.owner}** for more information"
+            )
+        }]
         all_commands = await self.bot.tree.fetch_commands()
 
         for cog_name, cog in self.bot.cogs.items():

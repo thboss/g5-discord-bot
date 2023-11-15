@@ -161,7 +161,7 @@ class APIManager:
     ):
         """"""
         url = f"/api/0.1/game-servers/{server_id}"
-        payload = {"cs2_settings.slots": slots}
+        payload = {"cs2_settings.slots": 14 if slots > 14 else slots}
         if game_mode: payload["cs2_settings.game_mode"] = game_mode
         if location: payload["location"] = location
 

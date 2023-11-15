@@ -11,6 +11,7 @@ from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPEx
 from bot.helpers.db import db
 from bot.helpers.models import LobbyModel
 from bot.helpers.errors import CustomError, JoinLobbyError
+from bot.helpers.utils import GAME_SERVER_LOCATIONS
 from bot.views import ReadyView, DropDownView
 from bot.bot import G5Bot
 from bot.helpers.configs import Config
@@ -56,31 +57,7 @@ CONNECT_TIME_CHOICES = [
 ]
 
 GAME_SERVER_LOCATION_CHOICES = [
-    app_commands.Choice(name="Canada", value="beauharnois"),
-    app_commands.Choice(name="USA", value="new_york_city"),
-    app_commands.Choice(name="USA - CA", value="los_angeles"),
-    app_commands.Choice(name="USA - FL", value="miami"),
-    app_commands.Choice(name="USA - IL", value="chicago"),
-    app_commands.Choice(name="USA - WA", value="portland"),
-    app_commands.Choice(name="USA - TX", value="dallas"),
-    app_commands.Choice(name="Denmark", value="copenhagen"),
-    app_commands.Choice(name="Finland", value="helsinki"),
-    app_commands.Choice(name="France", value="strasbourg"),
-    app_commands.Choice(name="Germany", value="dusseldorf"),
-    app_commands.Choice(name="Netherlands", value="amsterdam"),
-    app_commands.Choice(name="Poland", value="warsaw"),
-    app_commands.Choice(name="Russia", value="moscow"),
-    app_commands.Choice(name="Spain", value="barcelona"),
-    app_commands.Choice(name="Sweden", value="stockholm"),
-    app_commands.Choice(name="Turkey", value="istanbul"),
-    app_commands.Choice(name="United Kingdom", value="bristol"),
-    app_commands.Choice(name="Australia", value="sydney"),
-    app_commands.Choice(name="Brazil", value="sao_paulo"),
-    app_commands.Choice(name="Hong Kong", value="hong_kong"),
-    app_commands.Choice(name="India", value="mumbai"),
-    app_commands.Choice(name="Japan", value="tokyo"),
-    app_commands.Choice(name="Singapore", value="singapore"),
-    app_commands.Choice(name="South Africa", value="johannesburg"),
+    app_commands.Choice(name=v, value=k) for k, v in GAME_SERVER_LOCATIONS.items()
 ]
 
 
@@ -159,7 +136,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
         lobby_id = await db.insert_lobby(lobby_data)
 
-        await category.edit(name=f"Lobby #{lobby_id}")
+        await category.edit(name=f"Lobby #{lobby_id} [{location.name}]")
 
         all_maps = list(Config.maps.keys())
         await db.insert_lobby_maps(lobby_id, all_maps[:23])
@@ -462,7 +439,8 @@ class LobbyCog(commands.Cog, name="Lobby"):
         """"""
         embed = Embed(title=title)
 
-        info_str = f"Game mode: *{lobby_model.game_mode.capitalize()}*\n" \
+        info_str = f"Server Location: *{GAME_SERVER_LOCATIONS[lobby_model.location]}*\n" \
+                   f"Game mode: *{lobby_model.game_mode.capitalize()}*\n" \
                    f"Teams selection: *{lobby_model.team_method.capitalize()}*\n" \
                    f"Captains selection: *{lobby_model.captain_method.capitalize()}*\n" \
                    f"Maps selection: *{lobby_model.map_method.capitalize()}*"

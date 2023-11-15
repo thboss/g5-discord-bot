@@ -5,7 +5,7 @@ from bot.helpers.api import api
 from bot.helpers.db import db
 from bot.helpers.errors import CustomError
 
-class AuthCog(commands.Cog):
+class AuthCog(commands.Cog, name="Auth"):
     """"""
 
     def __init__(self, bot) -> None:
