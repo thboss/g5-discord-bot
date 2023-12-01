@@ -75,7 +75,7 @@ class WebServer:
                 embed = self.match_cog.embed_match_info(match_api, game_server)
                 team1_users = await db.get_match_users(match_api.id, match_model.guild, team='team1')
                 team2_users = await db.get_match_users(match_api.id, match_model.guild, team='team2')
-                self.add_teams_fields(embed, team1_users, team2_users)
+                self.match_cog.add_teams_fields(embed, team1_users, team2_users)
                 await message.edit(embed=embed)
             except Exception as e:
                 self.logger.error(e, exc_info=1)
