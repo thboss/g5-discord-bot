@@ -168,7 +168,8 @@ class MatchCog(commands.Cog, name="Match"):
 
             match_players = [ {
                 'steam_id_64': u.steam,
-                'team': 'team1' if u in team1_users_model else 'team2'
+                'team': 'team1' if u in team1_users_model else 'team2',
+                'nickname_override': u.member.display_name[:32]
             } for u in team1_users_model + team2_users_model]
 
             if map_method == 'veto':
