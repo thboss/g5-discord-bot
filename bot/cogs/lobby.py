@@ -266,8 +266,8 @@ class LobbyCog(commands.Cog, name="Lobby"):
     async def add_spectator(self, interaction: Interaction, user: Member):
         """"""
         await interaction.response.defer()
-        user_model = await db.get_user_by_discord_id(user.id, self.bot)
-        if not user_model:
+        player_model = await db.get_player_by_discord_id(user.id, self.bot)
+        if not player_model:
             raise CustomError(f"User {user.mention} must be linked.")
         
         try:
@@ -401,10 +401,10 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
     async def add_user_to_lobby(self, user: Member, lobby_model: LobbyModel, queued_users: List[Member]):
         """"""
-        user_model = await db.get_user_by_discord_id(user.id, self.bot)
+        player_model = await db.get_player_by_discord_id(user.id, self.bot)
         match_data = await db.get_user_match(user.id, lobby_model.guild)
 
-        if not user_model or not user_model.steam:
+        if not player_model:
             raise JoinLobbyError(user, "User not linked")
         if match_data:
             raise JoinLobbyError(user, "User in match")

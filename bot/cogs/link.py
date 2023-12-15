@@ -21,9 +21,9 @@ class LinkCog(commands.Cog, name='Link'):
         user = interaction.user
         steam_id = validate_steam(steam)
         guild_model = await db.get_guild_by_id(interaction.guild_id, self.bot)
-        user_model = await db.get_user_by_discord_id(user.id, self.bot)
+        player_model = await db.get_player_by_discord_id(user.id, self.bot)
 
-        if user_model:
+        if player_model:
             user_match = await db.get_user_match(user.id, interaction.guild)
             if user_match:
                 raise CustomError(
@@ -36,10 +36,10 @@ class LinkCog(commands.Cog, name='Link'):
                         "You can't change your steam while you are in spectators list.")
 
         try:
-            if not user_model:
-                await db.insert_user({'id': user.id, 'steam_id': f"'{steam_id}'"})
+            if not player_model:
+                await db.insert_player({'id': user.id, 'steam_id': steam_id})
             else:
-                await db.update_user(user.id, {'steam_id': f"'{steam_id}'"})
+                await db.update_player(user.id, {'steam_id': steam_id})
         except UniqueViolationError:
             raise CustomError(
                 f"This Steam is linked to another user. Please try different Steam ID.")

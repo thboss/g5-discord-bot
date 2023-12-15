@@ -124,7 +124,7 @@ class PickTeamsView(View):
     async def start(self, captain_method: str):
         """"""
         if captain_method == 'rank':
-            players_stats = await db.get_users(self.users)
+            players_stats = await db.get_players(self.users)
             players_stats.sort(key=lambda x: x.elo)
 
             for team in self.teams:

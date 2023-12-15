@@ -1,9 +1,8 @@
 import secrets
 import string
-from steam.steamid import SteamID, from_url
+from steam import steamid
 from PIL import Image, ImageFont, ImageDraw
 from discord import File
-import math
 import os
 
 from .errors import CustomError
@@ -67,47 +66,25 @@ GAME_SERVER_LOCATIONS = {
 
 def validate_steam(steam: str) -> int:
     try:
-        steam_id = SteamID(steam)
+        steam_id = steamid.SteamID(steam)
     except:
         raise CustomError("Invalid Steam!")
 
     if not steam_id.is_valid():
-        steam_id = from_url(steam, http_timeout=15)
+        steam_id = steamid.from_url(steam, http_timeout=15)
         if steam_id is None:
-            steam_id = from_url(
+            steam_id = steamid.from_url(
                 f'https://steamcommunity.com/id/{steam}/', http_timeout=15)
             if steam_id is None:
                 raise CustomError("Invalid Steam!")
 
-    return steam_id
+    return steam_id.as_64
 
 
 def indent(string, n=4):
     """"""
     indent = ' ' * n
     return indent + string.replace('\n', '\n' + indent)
-
-
-def align_text(text, length, align='center'):
-    """ Center the text within whitespace of input length. """
-    if length < len(text):
-        return text
-
-    whitespace = length - len(text)
-
-    if align == 'center':
-        pre = math.floor(whitespace / 2)
-        post = math.ceil(whitespace / 2)
-    elif align == 'left':
-        pre = 0
-        post = whitespace
-    elif align == 'right':
-        pre = whitespace
-        post = 0
-    else:
-        raise ValueError('Align argument must be "center", "left" or "right"')
-
-    return ' ' * pre + text + ' ' * post
 
 
 def calculate_elo(stats, old_elo=1000):
@@ -191,7 +168,7 @@ def generate_scoreboard_img(match_stats, team1_stats, team2_stats):
         fontbig = ImageFont.truetype(FONTS_DIR + "/ARIALUNI.TTF", 32)
         draw = ImageDraw.Draw(img)
 
-        title = f'{match_stats.team1_name[:20]}  [ {match_stats.team1_score} : {match_stats.team2_score} ]  {match_stats.team2_name[:20]}'
+        title = f'{match_stats.team1_name[:20]}     {match_stats.team1_score}  :  {match_stats.team2_score}     {match_stats.team2_name[:20]}'
         title_box = draw.textbbox((0, 0), title, font=fontbig)
         title_width = title_box[2] - title_box[0]
         draw.text(((width - title_width) // 2, 40), title, font=fontbig)
@@ -201,7 +178,7 @@ def generate_scoreboard_img(match_stats, team1_stats, team2_stats):
         map_width = map_box[2] - map_box[0]
         draw.text(((width - map_width) // 2, 85), map_name, font=fontbig)
 
-        draw.text((200, 172), match_stats.team1_name[:20], font=fontbig)
+        draw.text((200, 170), match_stats.team1_name[:20], font=fontbig)
         for idx, p in enumerate(team1_stats):
             draw.text((58, 290+50*idx), str(p.member.display_name)[:14], font=font)
             draw.text((340, 290+50*idx), str(p.kills), font=font)
@@ -210,14 +187,14 @@ def generate_scoreboard_img(match_stats, team1_stats, team2_stats):
             draw.text((790, 290+50*idx), str(p.mvps), font=font)
             draw.text((900, 290+50*idx), str(p.score), font=font)
     
-        draw.text((200, 643), match_stats.team2_name[:20], font=fontbig)
+        draw.text((200, 615), match_stats.team2_name[:20], font=fontbig)
         for idx, p in enumerate(team2_stats):
-            draw.text((58, 755+50*idx), str(p.member.display_name)[:14], font=font)
-            draw.text((340, 755+50*idx), str(p.kills), font=font)
-            draw.text((490, 755+50*idx), str(p.assists), font=font)
-            draw.text((640, 755+50*idx), str(p.deaths), font=font)
-            draw.text((790, 755+50*idx), str(p.mvps), font=font)
-            draw.text((900, 755+50*idx), str(p.score), font=font)
+            draw.text((58, 748+50*idx), str(p.member.display_name)[:14], font=font)
+            draw.text((340, 748+50*idx), str(p.kills), font=font)
+            draw.text((490, 748+50*idx), str(p.assists), font=font)
+            draw.text((640, 748+50*idx), str(p.deaths), font=font)
+            draw.text((790, 748+50*idx), str(p.mvps), font=font)
+            draw.text((900, 748+50*idx), str(p.score), font=font)
 
         img.save(SAVE_IMG_DIR + '/scoreboard.png')
 

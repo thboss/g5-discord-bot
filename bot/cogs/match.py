@@ -67,7 +67,7 @@ class MatchCog(commands.Cog, name="Match"):
     
     async def autobalance_teams(self, users: List[Member]):
         """"""
-        players_stats = await db.get_users(users)
+        players_stats = await db.get_players(users)
         players_stats.sort(key=lambda x: x.elo)
 
         # Balance teams
@@ -85,8 +85,8 @@ class MatchCog(commands.Cog, name="Match"):
             else:
                 team2_stats.append(players_stats.pop())
 
-        team1_users = [user_model.member for user_model in team1_stats]
-        team2_users = [user_model.member for user_model in team2_stats]
+        team1_users = [player_model.discord for player_model in team1_stats]
+        team2_users = [player_model.discord for player_model in team2_stats]
         return team1_users, team2_users
 
     def randomize_teams(self, users: List[Member]):
@@ -158,8 +158,8 @@ class MatchCog(commands.Cog, name="Match"):
             else:
                 team1_users, team2_users = self.randomize_teams(queue_users)
             
-            team1_users_model = await db.get_users(team1_users)
-            team2_users_model = await db.get_users(team2_users)
+            team1_players_model = await db.get_players(team1_users)
+            team2_players_model = await db.get_players(team2_users)
             team1_captain = team1_users[0]
             team2_captain = team2_users[0]
             team1_name = team1_captain.display_name
@@ -167,10 +167,10 @@ class MatchCog(commands.Cog, name="Match"):
             guild_model = await db.get_guild_by_id(guild.id, self.bot)
 
             match_players = [ {
-                'steam_id_64': u.steam,
-                'team': 'team1' if u in team1_users_model else 'team2',
-                'nickname_override': u.member.display_name[:32]
-            } for u in team1_users_model + team2_users_model]
+                'steam_id_64': player.steam_id,
+                'team': 'team1' if player in team1_players_model else 'team2',
+                'nickname_override': player.member.display_name[:32]
+            } for player in team1_players_model + team2_players_model]
 
             if map_method == 'veto':
                 veto_view = VetoView(message, mpool, team1_captain, team2_captain)
@@ -191,7 +191,7 @@ class MatchCog(commands.Cog, name="Match"):
             spectators = await db.get_spectators(guild)
             for spec in spectators:
                 if spec.member not in team1_users and spec.member not in team2_users:
-                    match_players.append({'steam_id_64': spec.steam, 'team': 'spectator'})
+                    match_players.append({'steam_id_64': spec.steam_id, 'team': 'spectator'})
 
             await api.update_game_server(
                 game_server.id,

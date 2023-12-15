@@ -7,9 +7,9 @@ from typing import List, Union, Optional
 import discord
 
 from bot.helpers.configs import Config
-from bot.helpers.api import MatchPlayer
-from bot.helpers.utils import calculate_elo
-from bot.helpers.models import LobbyModel, MatchModel, GuildModel, UserModel
+from bot.helpers.api import MatchPlayer, Match
+from bot.helpers.models.playerstats import PlayerStatsModel
+from bot.helpers.models import LobbyModel, MatchModel, GuildModel, PlayerModel
 
 
 class DBManager:
@@ -56,7 +56,7 @@ class DBManager:
                     'DELETE FROM guilds WHERE id NOT IN (SELECT id FROM temp_guilds);'
                 )
 
-    async def get_match_by_id(self, match_id: int, bot) -> Optional["MatchModel"]:
+    async def get_match_by_id(self, match_id: str, bot) -> Optional["MatchModel"]:
         """"""
         sql = "SELECT * FROM matches\n" \
             f"    WHERE id = $1;"
@@ -78,87 +78,73 @@ class DBManager:
 
     async def get_guild_matches(self, guild: discord.Guild) -> List["MatchModel"]:
         """"""
-
         sql = "SELECT * FROM matches WHERE guild = $1;"
         matches_data = await self.query(sql, guild.id)
         return [MatchModel.from_dict(data, guild) for data in matches_data]
 
     async def get_user_match(self, user_id: int, guild: discord.Guild) -> Optional["MatchModel"]:
         """"""
-        sql = "SELECT m.* FROM match_users mu\n" \
-            "JOIN matches m\n" \
-            "    ON mu.match_id = m.id AND m.guild = $1\n" \
-            "WHERE mu.user_id = $2;"
-        data = await self.query(sql, guild.id, user_id)
+        sql = "SELECT * FROM matches m\n" \
+            "JOIN player_stats ps\n" \
+            "    ON ps.match_id = m.id AND ps.user_id = $1\n" \
+            "WHERE m.guild=$2 AND m.finished=false;"
+        data = await self.query(sql, user_id, guild.id)
         if data:
             return MatchModel.from_dict(data[0], guild)
 
-    async def insert_match(self, data: dict) -> None:
+    async def insert_match(self, match_data: dict) -> None:
         """"""
-        cols = ", ".join(col for col in data)
+        cols = ", ".join(col for col in match_data)
         vals = ", ".join(f"'{val}'" if type(val) is
-                         str else str(val) for val in data.values())
+                         str else str(val) for val in match_data.values())
         sql = f"INSERT INTO matches ({cols})\n" \
             f"    VALUES({vals});"
 
         await self.query(sql)
 
-    async def insert_match_users(self, match_id: int, users: List[discord.Member]) -> None:
+    async def update_match(self, match_stats: Match) -> None:
         """"""
-        values = f", ".join(
-            f"('{match_id}', {user.id})" for user in users)
-        sql = f"INSERT INTO match_users VALUES {values};"
-        await self.query(sql)
+        dict_stats = match_stats.to_dict()
+        col_vals = ",\n    ".join(
+            f"{key} = {val}" for key, val in dict_stats.items())
+        sql = f"UPDATE matches SET {col_vals} WHERE id = $1;"
 
-    async def delete_match_user(self, match_id: int, user: discord.Member) -> None:
-        """"""
-        sql = "DELETE FROM match_users\n" \
-            f"    WHERE match_id = $1 AND user_id = $2;"
-        await self.query(sql, match_id, user.id)
+        await self.query(sql, match_stats.id)
 
-    async def delete_match(self, match_id: int) -> None:
+    async def delete_match(self, match_id: str) -> None:
         """"""
         sql = f"DELETE FROM matches WHERE id = $1;"
         await self.query(sql, match_id)
 
-    async def get_match_users(self, match_id: int, guild: discord.Guild, team=None) -> List[discord.Member]:
+    async def get_players_stats(self, match_id: str, team=None) -> List[PlayerStatsModel]:
         """"""
+        sql = "SELECT user_id FROM player_stats\n" \
+            f"    WHERE match_id = $1;"
         if team:
-            sql = "SELECT user_id FROM match_users\n" \
-                f"    WHERE match_id = $1 AND team = $2;"
-            query = await self.query(sql, match_id, team)
-        else:
-            sql = "SELECT user_id FROM match_users\n" \
-                f"    WHERE match_id = $1;"
-            query = await self.query(sql, match_id)
+            sql = sql.replace(";", " AND team=$2")
 
-        users_ids = list(map(lambda r: r['user_id'], query))
-        match_users = []
-        for uid in users_ids:
-            user = guild.get_member(uid)
-            if user:
-                match_users.append(user)
-        return match_users
+        query = await self.query(sql, match_id, team)
+        return [PlayerStatsModel.from_dict(data) for data in query]
 
-    async def get_user_by_discord_id(self, user_id: int, bot) -> Optional["UserModel"]:
+    async def get_player_by_discord_id(self, user_id: int, bot) -> Optional[PlayerModel]:
         """"""
         sql = "SELECT * FROM users\n" \
             f"    WHERE id = $1;"
         data = await self.query(sql, user_id)
         if data:
             user = bot.get_user(user_id)
-            return UserModel.from_dict(data[0], user)
+            return PlayerModel.from_dict(data[0], user)
 
-    async def get_user_by_steam_id(self, steam_id: str, bot) -> Optional["UserModel"]:
+    async def get_player_by_steam_id(self, steam_id: str, bot) -> Optional[PlayerModel]:
         """"""
         sql = "SELECT * FROM users\n" \
             f"    WHERE steam_id = $1;"
         data = await self.query(sql, steam_id)
         if data:
             user = bot.get_user(data[0]['id'])
-            return UserModel.from_dict(data[0], user)
+            return PlayerModel.from_dict(data[0], user)
 
-    async def get_users(self, users: List[discord.Member]) -> List["UserModel"]:
+    async def get_players(self, users: List[discord.Member]) -> List[PlayerModel]:
         """"""
         users_ids = [u.id for u in users]
         sql = "SELECT * FROM users\n" \
@@ -170,10 +156,10 @@ class DBManager:
         for user in filtered_users:
             for data in users_data:
                 if user.id == data['id']:
-                    return_obj.append(UserModel.from_dict(data, user))
+                    return_obj.append(PlayerModel.from_dict(data, user))
         return return_obj
 
-    async def insert_user(self, data: dict) -> None:
+    async def insert_player(self, data: dict) -> None:
         """"""
         cols = ", ".join(col for col in data)
         vals = ", ".join(str(val) for val in data.values())
@@ -181,7 +167,7 @@ class DBManager:
             f"    VALUES({vals})"
         await self.query(sql)
 
-    async def update_user(self, user_id: int, data: dict) -> None:
+    async def update_player(self, user_id: int, data: dict) -> None:
         """"""
         col_vals = ",\n    ".join(
             f"{key} = {val}" for key, val in data.items())
@@ -190,7 +176,7 @@ class DBManager:
             f'    WHERE id = $1;'
         await self.query(sql, user_id)
 
-    async def delete_user(self, user_id: int) -> None:
+    async def delete_player(self, user_id: int) -> None:
         """"""
         sql = "DELETE FROM users WHERE id = $1"
         await self.query(sql, user_id)
@@ -345,14 +331,14 @@ class DBManager:
             f'    WHERE id = $1;'
         await self.query(sql, guild_id)
         
-    async def get_spectators(self, guild: discord.Guild) -> List[UserModel]:
+    async def get_spectators(self, guild: discord.Guild) -> List[PlayerModel]:
         """"""
         sql = "SELECT * FROM users u\n" \
               "JOIN spectators s\n" \
               "    ON s.user_id = u.id\n" \
               "WHERE s.guild_id = $1;"
         results = await self.query(sql, guild.id)
-        return [UserModel.from_dict(row, guild.get_member(row["id"])) for row in results]
+        return [PlayerModel.from_dict(row, guild.get_member(row["id"])) for row in results]
     
     async def insert_spectators(self, *users: List[discord.Member], guild: discord.Guild):
         """"""
@@ -370,59 +356,43 @@ class DBManager:
     
     async def is_server_in_use(self, game_server_id: str):
         """"""
-        sql = "SELECT id FROM matches WHERE game_server_id = $1;"
+        sql = "SELECT id FROM matches WHERE game_server_id = $1 AND finished=false;"
         return await self.query(sql, game_server_id)
     
-    async def reset_user_stats(self, user_id: int):
+    async def get_player_stats(self, user_id: int, match_id: str=None):
         """"""
-        dict_stats = {
-            'kills' : 0,
-            'deaths' : 0,
-            'assists' : 0,
-            'headshots' : 0,
-            'k2' : 0,
-            'k3' : 0,
-            'k4' : 0,
-            'k5' : 0,
-            'played_matches' : 0,
-            'wins' : 0,
-            'elo' : 1000,
-        }
+        sql = "SELECT * FROM player_stats WHERE user_id = $1;"
+        if match_id:
+            sql = sql.replace(";", " AND match_id = $2;")
 
-        col_vals = ",\n    ".join(
-            f"{key} = {val}" for key, val in dict_stats.items())
-
-        sql = f'UPDATE users SET {col_vals} WHERE id = $1;'
-        await self.query(sql, user_id)
+        return await self.query(sql, user_id, match_id)
     
-    async def update_user_stats(self, user_id: int, stats: MatchPlayer):
+    async def insert_player_stats(self, user_id: int, stats: MatchPlayer):
         """"""
-        sql = "SELECT * FROM users WHERE id = $1;"
-        existing_stats = await self.query(sql, user_id)
-        if not existing_stats:
-            return
+        dict_stats = stats.to_dict()
+        dict_stats['user_id'] = user_id
 
-        dict_stats = {
-            'kills' : existing_stats[0]['kills'] + stats.kills,
-            'deaths' : existing_stats[0]['deaths'] + stats.deaths,
-            'assists' : existing_stats[0]['assists'] + stats.assists,
-            'headshots' : existing_stats[0]['headshots'] + stats.headshots,
-            'k2' : existing_stats[0]['k2'] + stats.k2,
-            'k3' : existing_stats[0]['k3'] + stats.k3,
-            'k4' : existing_stats[0]['k4'] + stats.k4,
-            'k5' : existing_stats[0]['k5'] + stats.k5,
-            'played_matches' : existing_stats[0]['played_matches'] + 1,
-            'elo' : calculate_elo(stats, existing_stats[0]['elo']),
-        }
-        
-        if stats.winner:
-            dict_stats['wins'] = existing_stats[0]['wins'] + 1
+        cols = ", ".join(col for col in dict_stats)
+        vals = ", ".join(f"'{val}'" if type(val) is
+                         str else str(val) for val in dict_stats.values())
+        sql = f"INSERT INTO player_stats ({cols})\n" \
+            f"    VALUES({vals});"
 
+        await self.query(sql)
+    
+    async def update_player_stats(self, user_id: int, stats: MatchPlayer):
+        """"""
+        dict_stats = stats.to_dict()
         col_vals = ",\n    ".join(
             f"{key} = {val}" for key, val in dict_stats.items())
 
-        sql = f'UPDATE users SET {col_vals} WHERE id = $1;'
+        sql = f'UPDATE player_stats SET {col_vals} WHERE user_id = $1 AND match_id = $2;'
+        await self.query(sql, user_id, stats.match_id)
+
+    async def delete_player_stats(self, user_id: int):
+        """"""
+        sql = f'DELETE FROM player_stats WHERE user_id = $1;'
         await self.query(sql, user_id)
- 
+
 
 db = DBManager()

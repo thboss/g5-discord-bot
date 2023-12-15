@@ -19,7 +19,7 @@
     "email": "",
     "password": ""
   },
-  "webserver" {
+  "webserver": {
     "host": "",
     "port": 3000
   }

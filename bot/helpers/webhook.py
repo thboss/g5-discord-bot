@@ -93,7 +93,7 @@ class WebServer:
             pass
         
         try:
-            leaderboard = await db.get_users(guild_model.guild.members)
+            leaderboard = await db.get_players(guild_model.guild.members)
             leaderboard.sort(key=lambda u: u.elo, reverse=True)
             leaderboard = list(filter(lambda u: u.played_matches != 0, leaderboard))
             if leaderboard:
@@ -108,20 +108,20 @@ class WebServer:
     async def _update_players_stats(self, team1_stats, team2_stats):
         for player_stat in team1_stats + team2_stats:
             try:
-                user_model = await db.get_user_by_steam_id(player_stat.steam_id, self.bot)
-                if user_model:
-                    await db.update_user_stats(user_model.member.id, player_stat)
+                player_model = await db.get_player_by_steam_id(player_stat.steam_id, self.bot)
+                if player_model:
+                    await db.update_player_stats(player_model.discord.id, player_stat)
             except Exception as e:
                 self.logger.error(e, exc_info=1)
 
     async def _release_match_stats(self, guild_model, match_api, team1_stats, team2_stats):
         try:
             for p in team1_stats:
-                user_model = await db.get_user_by_steam_id(p.steam_id, self.bot)
-                p.member = user_model.member
+                player_model = await db.get_player_by_steam_id(p.steam_id, self.bot)
+                p.member = player_model.discord
             for p in team2_stats:
-                user_model = await db.get_user_by_steam_id(p.steam_id, self.bot)
-                p.member = user_model.member
+                player_model = await db.get_player_by_steam_id(p.steam_id, self.bot)
+                p.member = player_model.discord
             team1_stats.sort(key=lambda x: x.score, reverse=True)
             team2_stats.sort(key=lambda x: x.score, reverse=True)
             file = generate_scoreboard_img(match_api, team1_stats[:6], team2_stats[:6])

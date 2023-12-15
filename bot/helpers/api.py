@@ -10,12 +10,10 @@ from bot.helpers.errors import APIError
 
 
 class MatchPlayer:
-    def __init__(self, data, winner):
+    def __init__(self, data):
         self.match_id = data['match_id']
         self.steam_id = data['steam_id_64']
         self.team = data['team']
-        self.connected = data['connected']
-        self.kicked = data['kicked']
         self.kills = data['stats']['kills']
         self.assists = data['stats']['assists']
         self.headshots = data['stats']['kills_with_headshot']
@@ -26,12 +24,28 @@ class MatchPlayer:
         self.k4 = data['stats']['4ks']
         self.k5 = data['stats']['5ks']
         self.score = data['stats']['score']
-        self.winner = winner
-        self.member = None
 
     @classmethod
     def from_dict(cls, data: dict, winner) -> "MatchPlayer":
         return cls(data, winner)
+    
+    @property
+    def to_dict(self) -> dict:
+        return {
+            'match_id': self.match_id,
+            'steam_id': self.steam_id,
+            'team': self.team,
+            'kills': self.kills,
+            'deaths': self.deaths,
+            'assists': self.assists,
+            'headshots': self.headshots,
+            'mvps': self.mvps,
+            'k2': self.k2,
+            'k3': self.k3,
+            'k4': self.k4,
+            'k5': self.k5,
+            'score': self.score
+        }
 
 
 class Match:
@@ -45,17 +59,33 @@ class Match:
         self.team2_name = match_data['team2']['name']
         self.team1_score = match_data['team1']['stats']['score']
         self.team2_score = match_data['team2']['stats']['score']
-        self.cancel_reason = match_data['cancel_reason']
+        self.canceled = match_data['cancel_reason'] is not None
         self.finished = match_data['finished']
         self.connect_time = match_data['settings']['connect_time']
-        self.map = match_data['settings']['map']
+        self.map_name = match_data['settings']['map']
         self.rounds_played = match_data['rounds_played']
-        self.team1_players = [MatchPlayer.from_dict(player, self.team1_score > self.team2_score) for player in match_data['players'] if player['team'] == 'team1']
-        self.team2_players = [MatchPlayer.from_dict(player, self.team1_score < self.team2_score) for player in match_data['players'] if player['team'] == 'team2']
+        self.team1_players = [MatchPlayer.from_dict(player) for player in match_data['players'] if player['team'] == 'team1']
+        self.team2_players = [MatchPlayer.from_dict(player) for player in match_data['players'] if player['team'] == 'team2']
 
     @classmethod
     def from_dict(cls, data: dict) -> "Match":
         return cls(data)
+    
+    @property
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'game_server_id': self.game_server_id,
+            'team1_name': self.team1_name,
+            'team2_name': self.team2_name,
+            'team1_score': self.team1_score,
+            'team2_score': self.team2_score,
+            'canceled': self.canceled,
+            'finished': self.finished,
+            'map_name': self.map_name,
+            'connect_time': self.connect_time,
+            'rounds_played': self.rounds_played
+        }
 
 class GameServer:
     """"""

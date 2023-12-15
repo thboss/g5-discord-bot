@@ -21,14 +21,14 @@ class StatsCog(commands.Cog, name='Stats'):
     async def view_stats(self, interaction: Interaction, target: Optional[Member]):
         await interaction.response.defer(ephemeral=True)
         user = target or interaction.user
-        user_model = await db.get_user_by_discord_id(user.id, self.bot)
+        player_model = await db.get_player_by_discord_id(user.id, self.bot)
 
-        if not user_model:
+        if not player_model:
             raise CustomError(
-                f"You must be linked to use this command.")
+                f"No statistics were recorded.")
         
         try:
-            file = generate_statistics_img(user_model)
+            file = generate_statistics_img(player_model)
             await interaction.followup.send(file=file)
         except Exception as e:
             self.bot.logger.error(e, exc_info=1)
@@ -37,9 +37,9 @@ class StatsCog(commands.Cog, name='Stats'):
     async def reset_stats(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
         user = interaction.user
-        user_model = await db.get_user_by_discord_id(user.id, self.bot)
+        player_model = await db.get_player_by_discord_id(user.id, self.bot)
 
-        if not user_model:
+        if not player_model:
             raise CustomError(
                 f"You must be linked to use this command.")
         
