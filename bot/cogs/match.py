@@ -1,15 +1,14 @@
 # match.py
 
-from discord.ext import commands, tasks
+from discord.ext import commands
 from discord import Embed, Member, Message, Guild, PermissionOverwrite, app_commands, Interaction
 from typing import List
 
 from random import choice, shuffle
 import asyncio
 
-from bot.helpers.api import api, Match
-from bot.helpers.db import db
-from bot.helpers.utils import generate_api_key, generate_scoreboard_img
+from bot.helpers.api import Match
+from bot.helpers.utils import generate_api_key
 from bot.helpers.models import GuildModel, MatchModel
 from bot.bot import G5Bot
 from bot.helpers.errors import APIError, CustomError
@@ -29,18 +28,18 @@ class MatchCog(commands.Cog, name="Match"):
         """"""
         await interaction.response.defer()
 
-        guild_model = await db.get_guild_by_id(interaction.guild.id, self.bot)
-        match_model = await db.get_match_by_id(match_id, self.bot)
+        guild_model = await self.bot.db.get_guild_by_id(interaction.guild.id, self.bot)
+        match_model = await self.bot.db.get_match_by_id(match_id, self.bot)
         if not match_model:
             raise CustomError("Invalid match ID.")
         
         try:
-            await api.cancel_match(match_id, guild_model.dathost_auth)
+            await self.bot.api.cancel_match(match_id, guild_model.dathost_auth)
         except:
             pass
 
         try:
-            await api.stop_game_server(match_model.game_server_id, guild_model.dathost_auth)
+            await self.bot.api.stop_game_server(match_model.game_server_id, guild_model.dathost_auth)
         except:
             pass
         
@@ -67,7 +66,7 @@ class MatchCog(commands.Cog, name="Match"):
     
     async def autobalance_teams(self, users: List[Member]):
         """"""
-        players_stats = await db.get_players(users)
+        players_stats = await self.bot.db.get_players(users)
         players_stats.sort(key=lambda x: x.elo)
 
         # Balance teams
@@ -158,13 +157,13 @@ class MatchCog(commands.Cog, name="Match"):
             else:
                 team1_users, team2_users = self.randomize_teams(queue_users)
             
-            team1_players_model = await db.get_players(team1_users)
-            team2_players_model = await db.get_players(team2_users)
+            team1_players_model = await self.bot.db.get_players(team1_users)
+            team2_players_model = await self.bot.db.get_players(team2_users)
             team1_captain = team1_users[0]
             team2_captain = team2_users[0]
             team1_name = team1_captain.display_name
             team2_name = team2_captain.display_name
-            guild_model = await db.get_guild_by_id(guild.id, self.bot)
+            guild_model = await self.bot.db.get_guild_by_id(guild.id, self.bot)
 
             match_players = [ {
                 'steam_id_64': player.steam_id,
@@ -188,12 +187,12 @@ class MatchCog(commands.Cog, name="Match"):
             await message.edit(embed=Embed(description='Setting up match on game server...'), view=None)
             await asyncio.sleep(2)
 
-            spectators = await db.get_spectators(guild)
+            spectators = await self.bot.db.get_spectators(guild)
             for spec in spectators:
                 if spec.member not in team1_users and spec.member not in team2_users:
                     match_players.append({'steam_id_64': spec.steam_id, 'team': 'spectator'})
 
-            await api.update_game_server(
+            await self.bot.api.update_game_server(
                 game_server.id,
                 len(match_players),
                 game_mode=game_mode,
@@ -201,7 +200,7 @@ class MatchCog(commands.Cog, name="Match"):
                 auth=guild_model.dathost_auth)
 
             api_key = generate_api_key()
-            api_match = await api.create_match(
+            api_match = await self.bot.api.create_match(
                 game_server.id,
                 map_name,
                 team1_name,
@@ -220,7 +219,7 @@ class MatchCog(commands.Cog, name="Match"):
                 guild
             )
 
-            await db.insert_match({
+            await self.bot.db.insert_match({
                 'id': api_match.id,
                 'game_server_id': game_server.id,
                 'guild': guild.id,
@@ -232,7 +231,7 @@ class MatchCog(commands.Cog, name="Match"):
                 'api_key': api_key
             })
 
-            await db.insert_match_users(api_match.id, team1_users + team2_users)
+            await self.bot.db.insert_match_users(api_match.id, team1_users + team2_users)
             embed = self.embed_match_info(api_match, game_server)
             self.add_teams_fields(embed, team1_users, team2_users)
 
@@ -262,10 +261,10 @@ class MatchCog(commands.Cog, name="Match"):
 
     async def find_game_server(self, dathost_auth):
         """"""
-        game_servers = await api.get_game_servers(auth=dathost_auth)
+        game_servers = await self.bot.api.get_game_servers(auth=dathost_auth)
 
         for game_server in game_servers:            
-            if not await db.is_server_in_use(game_server.id):
+            if not await self.bot.db.is_server_in_use(game_server.id):
                 return game_server
 
         raise ValueError("No game server available at the moment.")
@@ -309,7 +308,7 @@ class MatchCog(commands.Cog, name="Match"):
 
     async def finalize_match(self, match_model: MatchModel, guild_model: GuildModel):
         """"""
-        match_players = await db.get_match_users(match_model.id, match_model.guild)
+        match_players = await self.bot.db.get_match_users(match_model.id, match_model.guild)
         move_aws = [user.move_to(guild_model.waiting_channel) for user in match_players]
         await asyncio.gather(*move_aws, return_exceptions=True)
         
@@ -325,7 +324,7 @@ class MatchCog(commands.Cog, name="Match"):
             except:
                 pass
 
-        await db.delete_match(match_model.id)
+        await self.bot.db.delete_match(match_model.id)
 
 
 async def setup(bot):

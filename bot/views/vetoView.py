@@ -2,11 +2,10 @@
 
 from discord import Interaction, Member, Message, ButtonStyle, Embed
 from discord.ui import View, Button
-import random
 import asyncio
 from typing import List
 
-from bot.helpers.configs import Config
+from bot.resources import Config
 
 
 class MapButton(Button['VetoView']):

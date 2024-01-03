@@ -8,7 +8,6 @@ class PlayerStatsModel:
         self,
         match_id: str,
         user_id: int,
-        steam_id: int,
         team: str,
         kills: int,
         deaths: int,
@@ -24,7 +23,6 @@ class PlayerStatsModel:
         """"""
         self.match_id = match_id
         self.user_id = user_id
-        self.steam_id = steam_id
         self.team = team
         self.kills = kills
         self.deaths = deaths
@@ -51,7 +49,6 @@ class PlayerStatsModel:
         return cls(
             data['match_id'],
             data['user_id'],
-            data['steam_id'],
             data['team'],
             data['kills'],
             data['deaths'],

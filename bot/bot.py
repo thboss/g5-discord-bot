@@ -5,112 +5,63 @@ import os
 import traceback
 
 from discord.ext import commands
-from discord import app_commands, Interaction, Embed, Guild, errors
+from discord import Guild
 
-from bot.helpers.webhook import WebServer
+from .helpers.webhook import WebServer
 
-from .helpers.db import db
-from .helpers.api import api
-from .helpers.configs import Config
-from .helpers.errors import CustomError, APIError
+from .helpers.db import DBManager
+from .helpers.api import APIManager
+from .helpers.errors import on_app_command_error
 
 
 class G5Bot(commands.AutoShardedBot):
     """"""
 
     def __init__(self, intents: dict) -> None:
-        super().__init__(command_prefix=commands.when_mentioned_or(
-            Config.prefix), help_command=None, intents=intents)
+        super().__init__(command_prefix=commands.when_mentioned_or('!'), help_command=None, intents=intents)
 
         self.description = ""
         self.logger = logging.getLogger('Bot')
-        self.tree.on_error = self.on_app_command_error
-
-    async def on_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
-        """ Executed every time a slash command catches an error. """
-
-        if isinstance(error, app_commands.CommandOnCooldown):
-            minutes, seconds = divmod(error.retry_after, 60)
-            hours, minutes = divmod(minutes, 60)
-            hours = hours % 24
-            hours = f'{round(hours)} hours ' if round(hours) > 0 else ''
-            minutes = f'{round(minutes)} minutes ' if round(minutes) > 0 else ''
-            seconds = f'{round(seconds)} seconds ' if round(seconds) > 0 else ''
-            description = f"**Please slow down** - You can use this command again in {hours}{minutes}{seconds}"
-        elif isinstance(error, (CustomError, APIError)):
-            description = error.message
-        elif isinstance(error, app_commands.MissingPermissions):
-            description = "You are missing the permission(s) `" \
-                + ", ".join(error.missing_permissions) \
-                + "` to execute this command!"
-        elif isinstance(error, (app_commands.BotMissingPermissions, errors.Forbidden)):
-            description = "I am missing the permission(s) `" \
-                + ", ".join(error.missing_permissions) \
-                + "` to fully perform this command!"
-        else:
-            description = "Something went wrong, see logs for more details."
-            self.log_exception(
-                f'Unhandled exception in "{interaction.command.name}" command: ', error)
-            
-        embed = Embed(description=description, color=0xE02B2B)
-
-        if not interaction.response.is_done():
-            await interaction.response.defer()
-
-        await interaction.edit_original_response(embed=embed, view=None)
-
-    def log_exception(self, msg, error):
-        """ Logs an exception. """
-        logger_cog = self.get_cog('Logger')
-        logger_cog.log_exception(msg, error)
-
-    @commands.Cog.listener()
-    async def on_connect(self) -> None:
-        """"""
-        await db.connect()
-        api.connect(self.loop)
+        self.tree.on_error = on_app_command_error
+        self.db: DBManager = DBManager(self)
+        self.api: APIManager = APIManager(self)
+        self.webserver: WebServer = WebServer(self)
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
-        web_server = WebServer(self)
-        await web_server.start_webhook_server()
+        await self.db.connect()
+        self.api.connect(self.loop)
+        await self.webserver.start_webhook_server()
 
         #  Sync guilds' information with the database.
         if self.guilds:
-            await db.sync_guilds([g.id for g in self.guilds])
+            await self.db.sync_guilds([g.id for g in self.guilds])
             for guild in self.guilds:
                 try:
                     await self.check_guild_requirements(guild)
                 except: pass
 
-        # Sync slash commands
-        guild = self.get_guild(Config.guild_id)
-        if guild:
-            await self.tree.sync(guild=guild)
-            self.tree.copy_global_to(guild=guild)
-        else:
-            self.logger.warning(f"No guild found for id {Config.guild_id}")
-        # Sync commands globally if enabled
-        if Config.sync_commands_globally:
-            self.logger.info("Syncing commands globally...")
-            await self.tree.sync()
+        self.logger.info("Syncing commands globally...")
+        await self.tree.sync()
+        self.logger.info("Commands have been successfully synced globally.")
+        self.logger.info('Bot is ready to use in %s Discord servers', len(self.guilds))
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild) -> None:
         """"""
-        await db.sync_guilds([g.id for g in self.guilds])
+        await self.db.sync_guilds([g.id for g in self.guilds])
         await self.check_guild_requirements(guild)
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild) -> None:
         """"""
-        await db.sync_guilds([g.id for g in self.guilds])
+        await self.db.sync_guilds([g.id for g in self.guilds])
 
     async def close(self):
         """"""
         await super().close()
-        await db.close()
-        await api.close()
+        await self.db.close()
+        await self.api.close()
 
     async def load_cogs(self) -> None:
         """ Load extensions in the cogs folder. """
@@ -132,7 +83,7 @@ class G5Bot(commands.AutoShardedBot):
 
     async def check_guild_requirements(self, guild: Guild) -> None:
         """"""
-        guild_model = await db.get_guild_by_id(guild.id, self)
+        guild_model = await self.db.get_guild_by_id(guild.id)
         category = guild_model.category
         linked_role = guild_model.linked_role
         waiting_channel = guild_model.waiting_channel
@@ -162,4 +113,4 @@ class G5Bot(commands.AutoShardedBot):
                 'results_channel': results_channel.id,
                 'leaderboard_channel': leaderboard_channel.id,
             }
-            await db.update_guild_data(guild.id, dict_data)
+            await self.db.update_guild_data(guild.id, dict_data)

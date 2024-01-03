@@ -5,7 +5,7 @@ from discord.ui import View, Button
 from random import shuffle
 from typing import List
 
-from bot.helpers.db import db
+from bot.bot import G5Bot
 
 
 class PlayerButton(Button['PickTeamsView']):
@@ -18,12 +18,13 @@ class PlayerButton(Button['PickTeamsView']):
 
 
 class PickTeamsView(View):
-    def __init__(self, message: Message, users: List[Member], timeout=180):
+    def __init__(self, bot: G5Bot, message: Message, users: List[Member], timeout=180):
         super().__init__(timeout=timeout)
         self.players_buttons = [PlayerButton(user) for user in users]
         for button in self.players_buttons:
             self.add_item(button)
 
+        self.bot = bot
         self.message = message
         self.users = users
         self.pick_order = '1' + '2211' * 20
@@ -124,7 +125,7 @@ class PickTeamsView(View):
     async def start(self, captain_method: str):
         """"""
         if captain_method == 'rank':
-            players_stats = await db.get_players(self.users)
+            players_stats = await self.bot.db.get_players(self.users)
             players_stats.sort(key=lambda x: x.elo)
 
             for team in self.teams:

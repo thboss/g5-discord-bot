@@ -6,7 +6,7 @@ from typing import List, Union, Optional
 
 import discord
 
-from bot.helpers.configs import Config
+from bot.resources import Config
 from bot.helpers.api import MatchPlayer, Match
 from bot.helpers.models.playerstats import PlayerStatsModel
 from bot.helpers.models import LobbyModel, MatchModel, GuildModel, PlayerModel
@@ -15,8 +15,9 @@ from bot.helpers.models import LobbyModel, MatchModel, GuildModel, PlayerModel
 class DBManager:
     """ Manages the connection to the PostgreSQL database. """
 
-    def __init__(self):
+    def __init__(self, bot):
         self.db_pool = None
+        self.bot = bot
         self.logger = logging.getLogger('DB')
 
     async def connect(self) -> None:
@@ -56,23 +57,23 @@ class DBManager:
                     'DELETE FROM guilds WHERE id NOT IN (SELECT id FROM temp_guilds);'
                 )
 
-    async def get_match_by_id(self, match_id: str, bot) -> Optional["MatchModel"]:
+    async def get_match_by_id(self, match_id: str) -> Optional["MatchModel"]:
         """"""
         sql = "SELECT * FROM matches\n" \
             f"    WHERE id = $1;"
         data = await self.query(sql, match_id)
         if data:
-            guild = bot.get_guild(data[0]['guild'])
+            guild = self.bot.get_guild(data[0]['guild'])
             if guild:
                 return MatchModel.from_dict(data[0], guild)
 
-    async def get_match_by_api_key(self, api_key: str, bot) -> Optional["MatchModel"]:
+    async def get_match_by_api_key(self, api_key: str) -> Optional["MatchModel"]:
         """"""
         sql = "SELECT * FROM matches\n" \
             f"    WHERE api_key = $1;"
         data = await self.query(sql, api_key)
         if data:
-            guild = bot.get_guild(data[0]['guild'])
+            guild = self.bot.get_guild(data[0]['guild'])
             if guild:
                 return MatchModel.from_dict(data[0], guild)
 
@@ -126,22 +127,22 @@ class DBManager:
         query = await self.query(sql, match_id, team)
         return [PlayerStatsModel.from_dict(data) for data in query]
 
-    async def get_player_by_discord_id(self, user_id: int, bot) -> Optional[PlayerModel]:
+    async def get_player_by_discord_id(self, user_id: int) -> Optional[PlayerModel]:
         """"""
         sql = "SELECT * FROM users\n" \
             f"    WHERE id = $1;"
         data = await self.query(sql, user_id)
         if data:
-            user = bot.get_user(user_id)
+            user = self.bot.get_user(user_id)
             return PlayerModel.from_dict(data[0], user)
 
-    async def get_player_by_steam_id(self, steam_id: str, bot) -> Optional[PlayerModel]:
+    async def get_player_by_steam_id(self, steam_id: str) -> Optional[PlayerModel]:
         """"""
         sql = "SELECT * FROM users\n" \
             f"    WHERE steam_id = $1;"
         data = await self.query(sql, steam_id)
         if data:
-            user = bot.get_user(data[0]['id'])
+            user = self.bot.get_user(data[0]['id'])
             return PlayerModel.from_dict(data[0], user)
 
     async def get_players(self, users: List[discord.Member]) -> List[PlayerModel]:
@@ -181,12 +182,12 @@ class DBManager:
         sql = "DELETE FROM users WHERE id = $1"
         await self.query(sql, user_id)
 
-    async def get_lobby_by_id(self, lobby_id: int, bot) -> Union["LobbyModel", None]:
+    async def get_lobby_by_id(self, lobby_id: int) -> Union["LobbyModel", None]:
         """"""
         sql = "SELECT * FROM lobbies WHERE id = $1;"
         data = await self.query(sql, lobby_id)
         if data:
-            guild = bot.get_guild(data[0]['guild'])
+            guild = self.bot.get_guild(data[0]['guild'])
             if guild:
                 return LobbyModel.from_dict(data[0], guild)
 
@@ -215,7 +216,7 @@ class DBManager:
 
     async def get_user_lobby(self, user_id: int, guild: discord.Guild) -> Union["LobbyModel", None]:
         """"""
-        sql = "SELECT l.* FROM queued_users qu\n" \
+        sql = "SELECT l.* FROM lobby_users qu\n" \
             "JOIN lobbies l\n" \
             "    ON qu.lobby_id = l.id AND l.guild = $1\n" \
             "WHERE qu.user_id = $2;"
@@ -251,33 +252,33 @@ class DBManager:
 
     async def get_lobby_users(self, lobby_id: int, guild) -> List[discord.Member]:
         """"""
-        sql = "SELECT user_id FROM queued_users\n" \
+        sql = "SELECT user_id FROM lobby_users\n" \
             f"    WHERE lobby_id = $1;"
         query = await self.query(sql, lobby_id)
         users_ids = list(map(lambda r: r['user_id'], query))
-        queued_users = []
+        lobby_users = []
         for uid in users_ids:
             user = guild.get_member(uid)
             if user:
-                queued_users.append(user)
-        return queued_users
+                lobby_users.append(user)
+        return lobby_users
 
     async def insert_lobby_user(self, lobby_id: int, user: discord.Member) -> None:
         """"""
-        sql = "INSERT INTO queued_users (lobby_id, user_id)\n" \
+        sql = "INSERT INTO lobby_users (lobby_id, user_id)\n" \
             f"    VALUES($1, $2);"
         await self.query(sql, lobby_id, user.id)
 
     async def delete_lobby_users(self, lobby_id: int, users: List[discord.Member]) -> List[dict]:
         """"""
-        sql = "DELETE FROM queued_users\n" \
+        sql = "DELETE FROM lobby_users\n" \
             f"    WHERE lobby_id = $1 AND user_id::BIGINT = ANY(ARRAY{[u.id for u in users]}::BIGINT[])\n" \
             "    RETURNING user_id;"
         return await self.query(sql, lobby_id)
 
     async def clear_lobby_users(self, lobby_id: int) -> None:
         """"""
-        sql = f"DELETE FROM queued_users WHERE lobby_id = $1;"
+        sql = f"DELETE FROM lobby_users WHERE lobby_id = $1;"
         await self.query(sql, lobby_id)
 
     async def get_lobby_maps(self, lobby_id: int) -> List[str]:
@@ -313,13 +314,13 @@ class DBManager:
         if insert_maps:
             await self.insert_lobby_maps(lobby_id, insert_maps)
 
-    async def get_guild_by_id(self, guild_id: int, bot) -> Union["GuildModel", None]:
+    async def get_guild_by_id(self, guild_id: int) -> Union["GuildModel", None]:
         """"""
         sql = "SELECT * FROM guilds\n" \
             f"    WHERE id =  $1;"
         data = await self.query(sql, guild_id)
         if data:
-            guild = bot.get_guild(guild_id)
+            guild = self.bot.get_guild(guild_id)
             return GuildModel.from_dict(data[0], guild)
 
     async def update_guild_data(self, guild_id: int, data: dict) -> None:
@@ -393,6 +394,3 @@ class DBManager:
         """"""
         sql = f'DELETE FROM player_stats WHERE user_id = $1;'
         await self.query(sql, user_id)
-
-
-db = DBManager()

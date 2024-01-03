@@ -4,7 +4,6 @@ from asyncpg.exceptions import UniqueViolationError
 
 from discord.ext import commands
 from discord import app_commands, Embed, Interaction
-from bot.helpers.db import db
 from bot.helpers.errors import CustomError
 from bot.helpers.utils import validate_steam
 from bot.bot import G5Bot
@@ -20,16 +19,16 @@ class LinkCog(commands.Cog, name='Link'):
         await interaction.response.defer(ephemeral=True)
         user = interaction.user
         steam_id = validate_steam(steam)
-        guild_model = await db.get_guild_by_id(interaction.guild_id, self.bot)
-        player_model = await db.get_player_by_discord_id(user.id, self.bot)
+        guild_model = await self.bot.db.get_guild_by_id(interaction.guild_id, self.bot)
+        player_model = await self.bot.db.get_player_by_discord_id(user.id, self.bot)
 
         if player_model:
-            user_match = await db.get_user_match(user.id, interaction.guild)
+            user_match = await self.bot.db.get_user_match(user.id, interaction.guild)
             if user_match:
                 raise CustomError(
                     f"You can't change your steam while you belong to a live match #{user_match.id}")
             
-            spectators = await db.get_spectators(interaction.guild)
+            spectators = await self.bot.db.get_spectators(interaction.guild)
             for spec in spectators:
                 if spec.user == user:
                     raise CustomError(
@@ -37,9 +36,9 @@ class LinkCog(commands.Cog, name='Link'):
 
         try:
             if not player_model:
-                await db.insert_player({'id': user.id, 'steam_id': steam_id})
+                await self.bot.db.insert_player({'id': user.id, 'steam_id': steam_id})
             else:
-                await db.update_player(user.id, {'steam_id': steam_id})
+                await self.bot.db.update_player(user.id, {'steam_id': steam_id})
         except UniqueViolationError:
             raise CustomError(
                 f"This Steam is linked to another user. Please try different Steam ID.")

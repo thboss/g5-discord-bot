@@ -6,15 +6,14 @@ from collections import defaultdict
 import asyncio
 
 from discord.ext import commands
-from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPException, SelectOption
+from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPException
 
-from bot.helpers.db import db
+from bot.bot import G5Bot
 from bot.helpers.models import LobbyModel
 from bot.helpers.errors import CustomError, JoinLobbyError
 from bot.helpers.utils import GAME_SERVER_LOCATIONS
-from bot.views import ReadyView, DropDownView
-from bot.bot import G5Bot
-from bot.helpers.configs import Config
+from bot.views import ReadyView
+from bot.resources import Config
 
 
 CAPACITY_CHOICES = [
@@ -79,7 +78,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         captains_method="Captains selection method",
         map_method="Map selection method",
         connect_time="Time in seconds until match is canceled if not everyone has joined",
-        location="Game server location"
+        game_server_location="Game server location"
     )
     @app_commands.choices(
         capacity=CAPACITY_CHOICES,
@@ -88,7 +87,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         map_method=MAP_SELECTION_CHOICES,
         game_mode=GAME_MODE_CHOICES,
         connect_time=CONNECT_TIME_CHOICES,
-        location=GAME_SERVER_LOCATION_CHOICES
+        game_server_location=GAME_SERVER_LOCATION_CHOICES
     )
     @app_commands.checks.has_permissions(administrator=True)
     async def create_lobby(
@@ -96,7 +95,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         interaction: Interaction,
         capacity: app_commands.Choice[int],
         game_mode: app_commands.Choice[str],
-        location: app_commands.Choice[str],
+        game_server_location: app_commands.Choice[str],
         connect_time: app_commands.Choice[int],
         teams_method: app_commands.Choice[str],
         captains_method: app_commands.Choice[str],
@@ -106,42 +105,34 @@ class LobbyCog(commands.Cog, name="Lobby"):
         await interaction.response.defer(ephemeral=True)
 
         guild = interaction.guild
-        guild_model = await db.get_guild_by_id(guild.id, self.bot)
-        category = await guild.create_category(name="Lobby")
-        text_channel = await guild.create_text_channel(category=category, name='Queue')
+        guild_model = await self.bot.db.get_guild_by_id(guild.id)
         voice_channel = await guild.create_voice_channel(
-            category=category,
+            category=guild_model.category,
             name='Lobby',
             user_limit=capacity.value)
 
-        await text_channel.set_permissions(guild.self_role, send_messages=True)
         await voice_channel.set_permissions(guild.self_role, connect=True)
-        await text_channel.set_permissions(guild.default_role, send_messages=False)
         await voice_channel.set_permissions(guild.default_role, connect=False)
         await voice_channel.set_permissions(guild_model.linked_role, connect=True)
+        await voice_channel.set_permissions(guild.default_role, send_messages=False)
 
         lobby_data = {
             'guild': guild.id,
             'capacity': capacity.value,
             'game_mode': game_mode.value,
-            'location': location.value,
+            'gs_location': game_server_location.value,
             'connect_time': connect_time.value,
             'team_method': teams_method.value,
             'captain_method': captains_method.value,
             'map_method': map_method.value,
-            'category': category.id,
-            'queue_channel': text_channel.id,
             'lobby_channel': voice_channel.id
         }
 
-        lobby_id = await db.insert_lobby(lobby_data)
+        lobby_id = await self.bot.db.insert_lobby(lobby_data)
 
-        await category.edit(name=f"Lobby #{lobby_id} [{location.name}]")
+        await voice_channel.edit(name=f"Lobby #{lobby_id} [{game_server_location.name}]")
 
-        all_maps = list(Config.maps.keys())
-        await db.insert_lobby_maps(lobby_id, all_maps[:23])
-
-        lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
+        lobby_model = await self.bot.db.get_lobby_by_id(lobby_id)
         await self.update_queue_msg(lobby_model)
 
         embed = Embed(
@@ -158,33 +149,23 @@ class LobbyCog(commands.Cog, name="Lobby"):
         """"""
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
-        lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
+        lobby_model = await self.bot.db.get_lobby_by_id(lobby_id)
         if not lobby_model:
             raise CustomError("Invalid Lobby ID")
 
         if lobby_model.guild.id != guild.id:
             raise CustomError("This lobby was not created in this server.")
 
-        if lobby_model.text_channel and lobby_model.text_channel.id == interaction.channel.id:
-            raise CustomError(
-                "You can not use this command in the lobby's channel.")
-
         try:
-            await db.delete_lobby(lobby_id)
+            await self.bot.db.delete_lobby(lobby_id)
         except Exception as e:
             self.bot.log_exception(f"Failed to remove lobby #{lobby_id}:", e)
             raise CustomError("Something went wrong! Please try again later.")
 
-        for channel in [
-            lobby_model.voice_channel,
-            lobby_model.text_channel,
-            lobby_model.category
-        ]:
-            if channel is not None:
-                try:
-                    await channel.delete()
-                except HTTPException:
-                    pass
+        try:
+            await lobby_model.voice_channel.delete()
+        except HTTPException:
+            pass
 
         embed = Embed(description=f"Lobby #{lobby_model.id} has been removed.")
         await interaction.followup.send(embed=embed, ephemeral=True)
@@ -199,8 +180,8 @@ class LobbyCog(commands.Cog, name="Lobby"):
         """"""
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
-        lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
-        guild_model = await db.get_guild_by_id(guild.id, self.bot)
+        lobby_model = await self.bot.db.get_lobby_by_id(lobby_id)
+        guild_model = await self.bot.db.get_guild_by_id(guild.id)
         if not lobby_model:
             raise CustomError("Invalid Lobby ID")
 
@@ -214,64 +195,23 @@ class LobbyCog(commands.Cog, name="Lobby"):
                 except Exception as e:
                     pass
 
-            await db.clear_lobby_users(lobby_model.id)
+            await self.bot.db.clear_lobby_users(lobby_model.id)
             await self.update_queue_msg(lobby_model, title="Lobby has been emptied")
 
         embed = Embed(description=f"Lobby #{lobby_model.id} has been emptied.")
         await interaction.followup.send(embed=embed, ephemeral=True)
-
-    @app_commands.command(name='map-pool', description='Modify map pool')
-    @app_commands.describe(lobby_id="Lobby ID.")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def mpool(self, interaction: Interaction, lobby_id: int):
-        """"""
-        await interaction.response.defer(ephemeral=True)
-        guild = interaction.guild
-        user = interaction.user
-        embed = Embed()
-
-        lobby_model = await db.get_lobby_by_id(lobby_id, self.bot)
-        if not lobby_model or lobby_model.guild.id != guild.id:
-            raise CustomError("Invalid Lobby ID")
-
-        lobby_maps = await db.get_lobby_maps(lobby_id)
-    
-        placeholder = "Select maps from the list"
-        options = [
-            SelectOption(
-                label=display_name,
-                value=map_name,
-                default=map_name in lobby_maps
-            ) for map_name, display_name in Config.maps.items()
-        ]
-
-        dropdown = DropDownView(user, placeholder, options, 7, len(options))
-        message = await interaction.followup.send(view=dropdown, wait=True)
-        await dropdown.wait()
-
-        if dropdown.selected_options is None:
-            embed.description = "Timeout! Your haven't selected maps in time."
-            await message.edit(embed=embed, view=None)
-            return
-        
-        active_maps = list(filter(lambda x: x in dropdown.selected_options, Config.maps.keys()))
-        await db.update_lobby_maps(lobby_id, active_maps, lobby_maps)
-
-        embed.description = f"Map pool for lobby **#{lobby_id}** updated successfully."
-        embed.add_field(name="Active Maps", value='\n'.join(Config.maps[m] for m in active_maps))
-        await message.edit(embed=embed, view=None)
 
     @app_commands.command(name="add-spectator", description="Add a user to the matches")
     @app_commands.checks.has_permissions(administrator=True)
     async def add_spectator(self, interaction: Interaction, user: Member):
         """"""
         await interaction.response.defer()
-        player_model = await db.get_player_by_discord_id(user.id, self.bot)
+        player_model = await self.bot.db.get_player_by_discord_id(user.id)
         if not player_model:
             raise CustomError(f"User {user.mention} must be linked.")
         
         try:
-            await db.insert_spectators(user, guild=interaction.guild)
+            await self.bot.db.insert_spectators(user, guild=interaction.guild)
         except UniqueViolationError:
             raise CustomError(f"User {user.mention} is already in spectators list")
 
@@ -283,7 +223,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
     async def remove_spectator(self, interaction: Interaction, user: Member):
         """"""
         await interaction.response.defer()
-        deleted = await db.delete_spectators(user, guild=interaction.guild)
+        deleted = await self.bot.db.delete_spectators(user, guild=interaction.guild)
         if not deleted:
             raise CustomError(f"User {user.mention} is not in spectators list")
         
@@ -294,7 +234,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
     async def spectators_list(self, interaction: Interaction):
         """"""
         await interaction.response.defer()
-        spectators = await db.get_spectators(interaction.guild)
+        spectators = await self.bot.db.get_spectators(interaction.guild)
         
         if spectators:
             description = "\n".join(f"{idx}. {spec.user.mention}" for idx, spec in enumerate(spectators))
@@ -311,7 +251,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
             return
 
         if before.channel is not None:
-            lobby_model = await db.get_lobby_by_voice_channel(before.channel)
+            lobby_model = await self.bot.db.get_lobby_by_voice_channel(before.channel)
             if lobby_model:
                 if not self.in_progress[lobby_model.id]:
                     async with self.locks[lobby_model.id]:
@@ -322,67 +262,67 @@ class LobbyCog(commands.Cog, name="Lobby"):
                                 "Uncaght exception when handling 'cogs.lobby._leave()' method:", e)
 
         if after.channel is not None:
-            lobby_model = await db.get_lobby_by_voice_channel(after.channel)
-            if lobby_model and lobby_model.text_channel:
+            lobby_model = await self.bot.db.get_lobby_by_voice_channel(after.channel)
+            if lobby_model:
                 if not self.in_progress[lobby_model.id]:
                     async with self.locks[lobby_model.id]:
                         try:
                             await self._join(user, lobby_model)
                         except Exception as e:
-                            self.bot.log_exception(
-                                "Uncaught exception when handling 'cogs.lobby._join()' method:", e)
+                            self.bot.logger.error(
+                                "Uncaught exception when handling 'cogs.lobby._join()' method:", e, exc_info=1)
 
     async def _leave(self, user: Member, lobby_model: LobbyModel):
         """"""
-        removed = await db.delete_lobby_users(lobby_model.id, [user])
+        removed = await self.bot.db.delete_lobby_users(lobby_model.id, [user])
         if removed:
             title = f"User {user.display_name} removed from the lobby"
             await self.update_queue_msg(lobby_model, title)
 
     async def _join(self, user: Member, lobby_model: LobbyModel):
         """"""
-        queued_users = await db.get_lobby_users(lobby_model.id, lobby_model.guild)
+        lobby_users = await self.bot.db.get_lobby_users(lobby_model.id, lobby_model.guild)
         try:
-            await self.add_user_to_lobby(user, lobby_model, queued_users)
+            await self.add_user_to_lobby(user, lobby_model, lobby_users)
         except JoinLobbyError as e:
             title = e.message
         else:
             title = f"User **{user.display_name}** added to the queue."
-            queued_users.append(user)
+            lobby_users.append(user)
 
-            if len(queued_users) == lobby_model.capacity:
+            if len(lobby_users) == lobby_model.capacity:
                 self.in_progress[lobby_model.id] = True
                 title = None
-                guild_model = await db.get_guild_by_id(lobby_model.guild.id, self.bot)
-                lobby_model = await db.get_lobby_by_id(lobby_model.id, self.bot)
+                guild_model = await self.bot.db.get_guild_by_id(lobby_model.guild.id)
+                lobby_model = await self.bot.db.get_lobby_by_id(lobby_model.id)
 
                 try:
-                    queue_msg = await lobby_model.text_channel.fetch_message(lobby_model.message_id)
+                    queue_msg = await lobby_model.voice_channel.fetch_message(lobby_model.message_id)
                     await queue_msg.delete()
                 except:
                     pass
 
                 unreadied_users = []
-                ready_view = ReadyView(queued_users, lobby_model.text_channel)
+                ready_view = ReadyView(lobby_users, lobby_model.voice_channel)
                 await ready_view.start()
                 await ready_view.wait()
-                unreadied_users = set(queued_users) - ready_view.ready_users
+                unreadied_users = set(lobby_users) - ready_view.ready_users
 
                 if unreadied_users:
                     awaitables = [u.move_to(guild_model.waiting_channel) for u in unreadied_users]
-                    awaitables.append(db.delete_lobby_users(lobby_model.id, unreadied_users))
+                    awaitables.append(self.bot.db.delete_lobby_users(lobby_model.id, unreadied_users))
                     await asyncio.gather(*awaitables, return_exceptions=True)
                 else:
                     embed = Embed(description='Starting match setup...')
-                    setup_match_msg = await lobby_model.text_channel.send(embed=embed)
+                    setup_match_msg = await lobby_model.voice_channel.send(embed=embed)
 
-                    map_pool = await db.get_lobby_maps(lobby_model.id)
+                    map_pool = await self.bot.db.get_lobby_maps(lobby_model.id)
                     match_cog = self.bot.get_cog('Match')
                     match_started = await match_cog.start_match(
                         lobby_model.guild,
                         setup_match_msg,
                         map_pool,
-                        queue_users=queued_users,
+                        queue_users=lobby_users,
                         team_method=lobby_model.team_method,
                         captain_method=lobby_model.captain_method,
                         map_method=lobby_model.map_method,
@@ -391,67 +331,67 @@ class LobbyCog(commands.Cog, name="Lobby"):
                         location=lobby_model.location
                     )
                     if not match_started:
-                        awaitables = [u.move_to(guild_model.waiting_channel) for u in queued_users]
+                        awaitables = [u.move_to(guild_model.waiting_channel) for u in lobby_users]
                         await asyncio.gather(*awaitables, return_exceptions=True)
 
-                    await db.clear_lobby_users(lobby_model.id)
+                    await self.bot.db.clear_lobby_users(lobby_model.id)
                 self.in_progress[lobby_model.id] = False
 
         await self.update_queue_msg(lobby_model, title)
 
-    async def add_user_to_lobby(self, user: Member, lobby_model: LobbyModel, queued_users: List[Member]):
+    async def add_user_to_lobby(self, user: Member, lobby_model: LobbyModel, lobby_users: List[Member]):
         """"""
-        player_model = await db.get_player_by_discord_id(user.id, self.bot)
-        match_data = await db.get_user_match(user.id, lobby_model.guild)
+        player_model = await self.bot.db.get_player_by_discord_id(user.id)
+        match_data = await self.bot.db.get_user_match(user.id, lobby_model.guild)
 
         if not player_model:
             raise JoinLobbyError(user, "User not linked")
         if match_data:
             raise JoinLobbyError(user, "User in match")
-        if user in queued_users:
+        if user in lobby_users:
             raise JoinLobbyError(user, "User in lobby")
-        if len(queued_users) >= lobby_model.capacity:
+        if len(lobby_users) >= lobby_model.capacity:
             raise JoinLobbyError(user, "Lobby is full")
         try:
-            await db.insert_lobby_user(lobby_model.id, user)
+            await self.bot.db.insert_lobby_user(lobby_model.id, user)
         except UniqueViolationError:
             raise JoinLobbyError(user, "Please try again")
 
     async def update_queue_msg(self, lobby_model: LobbyModel, title: str=None):
         """"""
-        if not lobby_model.text_channel or not lobby_model.voice_channel:
+        if not lobby_model.voice_channel:
             return
 
-        lobby_model = await db.get_lobby_by_id(lobby_model.id, self.bot)
-        queued_users = await db.get_lobby_users(lobby_model.id, lobby_model.guild)
+        lobby_model = await self.bot.db.get_lobby_by_id(lobby_model.id)
+        lobby_users = await self.bot.db.get_lobby_users(lobby_model.id, lobby_model.guild)
 
         try:
-            queue_message = await lobby_model.text_channel.fetch_message(lobby_model.message_id)
+            queue_message = await lobby_model.voice_channel.fetch_message(lobby_model.message_id)
         except:
-            queue_message = await lobby_model.text_channel.send(embed=Embed(description="New Queue Message"))
-            await db.update_lobby(lobby_model.id, {'last_message': queue_message.id})
+            queue_message = await lobby_model.voice_channel.send(embed=Embed(description="New Queue Message"))
+            await self.bot.db.update_lobby(lobby_model.id, {'last_message': queue_message.id})
 
         embed = self._embed_queue(
-            title, lobby_model, queued_users)
+            title, lobby_model, lobby_users)
         await queue_message.edit(embed=embed, view=None)
 
-    def _embed_queue(self, title: str, lobby_model: LobbyModel, queued_users: List[Member]):
+    def _embed_queue(self, title: str, lobby_model: LobbyModel, lobby_users: List[Member]):
         """"""
         embed = Embed(title=title)
 
-        info_str = f"Server Location: *{GAME_SERVER_LOCATIONS[lobby_model.location]}*\n" \
+        info_str = f"Server Location: *{GAME_SERVER_LOCATIONS[lobby_model.gs_location]}*\n" \
                    f"Game mode: *{lobby_model.game_mode.capitalize()}*\n" \
                    f"Teams selection: *{lobby_model.team_method.capitalize()}*\n" \
                    f"Captains selection: *{lobby_model.captain_method.capitalize()}*\n" \
                    f"Maps selection: *{lobby_model.map_method.capitalize()}*"
 
-        queued_players_str = "*Lobby is empty*" if not queued_users else ""
-        for num, user in enumerate(queued_users, start=1):
+        queued_players_str = "*Lobby is empty*" if not lobby_users else ""
+        for num, user in enumerate(lobby_users, start=1):
             queued_players_str += f'{num}. {user.mention}\n'
 
         embed.add_field(name="**__Settings__**", value=info_str, inline=False)
         embed.add_field(
-            name=f"**__Players__** `({len(queued_users)}/{lobby_model.capacity})`:",
+            name=f"**__Players__** `({len(lobby_users)}/{lobby_model.capacity})`:",
             value=queued_players_str
         )
         embed.set_author(name=f"Lobby #{lobby_model.id}")

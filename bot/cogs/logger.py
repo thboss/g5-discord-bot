@@ -10,8 +10,8 @@ import traceback
 import discord
 from discord.ext import commands
 
-from ..helpers.utils import indent
-from ..helpers.configs import Config
+from bot.helpers.utils import indent
+from bot.resources import Config
 
 
 class ConsoleFormatter(logging.Formatter):
@@ -154,9 +154,6 @@ class Logger(commands.Cog):
         log_lines(
             logging.INFO,
             f"Running on: {platform.system()} {platform.release()} ({os.name})")
-        log_lines(
-            logging.INFO,
-            'Bot is ready to use in %s Discord servers', len(self.bot.guilds))
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):

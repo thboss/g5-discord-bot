@@ -4,14 +4,15 @@ from typing import Optional
 
 from discord.ext import commands
 from discord import app_commands, Interaction, Member, Embed
-from bot.helpers.db import db
+
+from bot.bot import G5Bot
 from bot.helpers.errors import CustomError
 from bot.views import ConfirmView
 from bot.helpers.utils import generate_statistics_img
 
 
 class StatsCog(commands.Cog, name='Stats'):
-    def __init__(self, bot):
+    def __init__(self, bot: G5Bot):
         self.bot = bot
 
     @app_commands.command(name="view-stats", description="View your stats or target's stats")
@@ -21,7 +22,7 @@ class StatsCog(commands.Cog, name='Stats'):
     async def view_stats(self, interaction: Interaction, target: Optional[Member]):
         await interaction.response.defer(ephemeral=True)
         user = target or interaction.user
-        player_model = await db.get_player_by_discord_id(user.id, self.bot)
+        player_model = await self.bot.db.get_player_by_discord_id(user.id, self.bot)
 
         if not player_model:
             raise CustomError(
@@ -37,7 +38,7 @@ class StatsCog(commands.Cog, name='Stats'):
     async def reset_stats(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
         user = interaction.user
-        player_model = await db.get_player_by_discord_id(user.id, self.bot)
+        player_model = await self.bot.db.get_player_by_discord_id(user.id, self.bot)
 
         if not player_model:
             raise CustomError(
@@ -52,7 +53,7 @@ class StatsCog(commands.Cog, name='Stats'):
             raise CustomError("Reset stats rejected")
         
         try:
-            await db.reset_user_stats(user.id)
+            await self.bot.db.reset_user_stats(user.id)
             embed.description = "Your stats reset successfully."
         except Exception as e:
             embed.description = "Something went wront, please try again later."
