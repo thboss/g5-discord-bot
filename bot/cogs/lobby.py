@@ -314,21 +314,19 @@ class LobbyCog(commands.Cog, name="Lobby"):
                     await asyncio.gather(*awaitables, return_exceptions=True)
                 else:
                     embed = Embed(description='Starting match setup...')
-                    setup_match_msg = await lobby_model.voice_channel.send(embed=embed)
+                    setup_msg = await lobby_model.voice_channel.send(embed=embed)
 
-                    map_pool = await self.bot.db.get_lobby_maps(lobby_model.id)
                     match_cog = self.bot.get_cog('Match')
                     match_started = await match_cog.start_match(
                         lobby_model.guild,
-                        setup_match_msg,
-                        map_pool,
+                        setup_msg,
                         queue_users=lobby_users,
                         team_method=lobby_model.team_method,
                         captain_method=lobby_model.captain_method,
                         map_method=lobby_model.map_method,
                         game_mode=lobby_model.game_mode,
                         connect_time=lobby_model.connect_time,
-                        location=lobby_model.location
+                        location=lobby_model.gs_location
                     )
                     if not match_started:
                         awaitables = [u.move_to(guild_model.waiting_channel) for u in lobby_users]

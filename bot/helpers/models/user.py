@@ -16,9 +16,9 @@ class PlayerModel:
         self.steam_id = steam_id
 
     @classmethod
-    def from_dict(cls, data: dict, bot) -> "PlayerModel":
+    def from_dict(cls, data: dict, user) -> "PlayerModel":
         """"""
         return cls(
-            bot.get_user(data['id']),
+            user,
             data['steam_id']
         )

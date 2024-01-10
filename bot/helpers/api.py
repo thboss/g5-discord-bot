@@ -26,8 +26,8 @@ class MatchPlayer:
         self.score = data['stats']['score']
 
     @classmethod
-    def from_dict(cls, data: dict, winner) -> "MatchPlayer":
-        return cls(data, winner)
+    def from_dict(cls, data: dict) -> "MatchPlayer":
+        return cls(data)
     
     @property
     def to_dict(self) -> dict:
@@ -184,7 +184,8 @@ class APIManager:
     ):
         """"""
         url = f"/api/0.1/game-servers/{server_id}"
-        payload = {"cs2_settings.slots": 14 if slots > 14 else slots}
+        # payload = {"cs2_settings.slots": 14 if slots > 14 else slots}
+        payload = {}
         if game_mode: payload["cs2_settings.game_mode"] = game_mode
         if location: payload["location"] = location
 

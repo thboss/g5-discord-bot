@@ -119,7 +119,7 @@ steps = [
         (
             'CREATE TABLE users(\n'
             '    id BIGSERIAL UNIQUE,\n'
-            '    steam_id VARCHAR(18) UNIQUE\n'
+            '    steam_id BIGSERIAL UNIQUE\n'
             ');'
         ),
         'DROP TABLE users;'
@@ -129,6 +129,7 @@ steps = [
             'CREATE TABLE player_stats(\n'
             '    match_id VARCHAR(32) DEFAULT NULL REFERENCES matches (id) ON DELETE CASCADE,\n'
             '    user_id BIGINT DEFAULT NULL REFERENCES users (id) ON DELETE CASCADE,\n'
+            '    steam_id BIGINT DEFAULT NULL,\n'
             '    team VARCHAR(5) DEFAULT NULL,\n'
             '    kills SMALLINT DEFAULT 0,\n'
             '    deaths SMALLINT DEFAULT 0,\n'
@@ -153,17 +154,6 @@ steps = [
             ');'
         ),
         'DROP TABLE lobby_users;'
-    ),
-    step(
-        (
-            'CREATE TABLE match_users(\n'
-            '    match_id VARCHAR(64) REFERENCES matches (id) ON DELETE CASCADE,\n'
-            '    user_id BIGINT REFERENCES users (id),\n'
-            '    team team DEFAULT NULL,\n'
-            '    CONSTRAINT match_user_pkey PRIMARY KEY (match_id, user_id)\n'
-            ');'
-        ),
-        'DROP TABLE match_users;'
     ),
     step(
         (

@@ -160,22 +160,16 @@ class DBManager:
                     return_obj.append(PlayerModel.from_dict(data, user))
         return return_obj
 
-    async def insert_player(self, data: dict) -> None:
+    async def insert_player(self, user_id: int, steam_id: int) -> None:
         """"""
-        cols = ", ".join(col for col in data)
-        vals = ", ".join(str(val) for val in data.values())
-        sql = f"INSERT INTO users ({cols})\n" \
-            f"    VALUES({vals})"
-        await self.query(sql)
+        sql = f"INSERT INTO users (id, steam_id)\n" \
+            f"    VALUES($1, $2);"
+        await self.query(sql, user_id, steam_id)
 
-    async def update_player(self, user_id: int, data: dict) -> None:
+    async def update_player(self, user_id: int, steam_id: int) -> None:
         """"""
-        col_vals = ",\n    ".join(
-            f"{key} = {val}" for key, val in data.items())
-        sql = 'UPDATE users\n' \
-            f'    SET {col_vals}\n' \
-            f'    WHERE id = $1;'
-        await self.query(sql, user_id)
+        sql = 'UPDATE users SET steam_id = $1 WHERE id = $2;'
+        await self.query(sql, steam_id, user_id)
 
     async def delete_player(self, user_id: int) -> None:
         """"""

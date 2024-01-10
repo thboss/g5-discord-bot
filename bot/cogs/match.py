@@ -12,6 +12,7 @@ from bot.helpers.utils import generate_api_key
 from bot.helpers.models import GuildModel, MatchModel
 from bot.bot import G5Bot
 from bot.helpers.errors import APIError, CustomError
+from bot.resources import Config
 from bot.views import VetoView, PickTeamsView
 
 
@@ -28,18 +29,18 @@ class MatchCog(commands.Cog, name="Match"):
         """"""
         await interaction.response.defer()
 
-        guild_model = await self.bot.db.get_guild_by_id(interaction.guild.id, self.bot)
-        match_model = await self.bot.db.get_match_by_id(match_id, self.bot)
+        guild_model = await self.bot.db.get_guild_by_id(interaction.guild.id)
+        match_model = await self.bot.db.get_match_by_id(match_id)
         if not match_model:
             raise CustomError("Invalid match ID.")
         
         try:
-            await self.bot.api.cancel_match(match_id, guild_model.dathost_auth)
+            await self.bot.api.cancel_match(match_id)
         except:
             pass
 
         try:
-            await self.bot.api.stop_game_server(match_model.game_server_id, guild_model.dathost_auth)
+            await self.bot.api.stop_game_server(match_model.game_server_id)
         except:
             pass
         
@@ -97,17 +98,11 @@ class MatchCog(commands.Cog, name="Match"):
         team2_users = temp_users[team_size:]
         return team1_users, team2_users
     
-    def add_teams_fields(self, embed: Embed, team1_users: List[Member], team2_users: List[Member]):
-        """"""
-        embed.add_field(name="Team 1", value="\n".join(f'{u.mention}' 
-            for u in team1_users), inline=False)
-        
-        embed.add_field(name="Team 2", value="\n".join(f'{u.mention}' 
-            for u in team2_users), inline=False)
-
     def embed_match_info(
         self,
         match_stats: Match,
+        team1_users: List[Member],
+        team2_users: List[Member],
         game_server=None,
     ):
         """"""
@@ -124,6 +119,12 @@ class MatchCog(commands.Cog, name="Match"):
         author_name = f"🟢 Match #{match_stats.id}"
         embed.set_author(name=author_name)
 
+        embed.add_field(name="Team 1", value="\n".join(f'{u.mention}' 
+            for u in team1_users), inline=False)
+        
+        embed.add_field(name="Team 2", value="\n".join(f'{u.mention}' 
+            for u in team2_users), inline=False)
+
         if self.bot.user.avatar:
             embed.set_thumbnail(url=self.bot.user.avatar.url)
 
@@ -138,7 +139,6 @@ class MatchCog(commands.Cog, name="Match"):
         self,
         guild: Guild,
         message: Message,
-        mpool: List[str],
         queue_users: List[Member]=[], 
         team_method: str='captains',
         map_method: str='veto',
@@ -163,14 +163,14 @@ class MatchCog(commands.Cog, name="Match"):
             team2_captain = team2_users[0]
             team1_name = team1_captain.display_name
             team2_name = team2_captain.display_name
-            guild_model = await self.bot.db.get_guild_by_id(guild.id, self.bot)
 
             match_players = [ {
-                'steam_id_64': player.steam_id,
+                'steam_id_64': str(player.steam_id),
                 'team': 'team1' if player in team1_players_model else 'team2',
-                'nickname_override': player.member.display_name[:32]
+                'nickname_override': player.discord.display_name[:32]
             } for player in team1_players_model + team2_players_model]
 
+            mpool = list(Config.maps.keys())
             if map_method == 'veto':
                 veto_view = VetoView(message, mpool, team1_captain, team2_captain)
                 await message.edit(embed=veto_view.embed_veto(), view=veto_view)
@@ -182,22 +182,21 @@ class MatchCog(commands.Cog, name="Match"):
             await message.edit(embed=Embed(description='Searching for available game servers...'), view=None)
             await asyncio.sleep(2)
 
-            game_server = await self.find_game_server(guild_model.dathost_auth)
+            game_server = await self.find_game_server()
 
             await message.edit(embed=Embed(description='Setting up match on game server...'), view=None)
             await asyncio.sleep(2)
 
             spectators = await self.bot.db.get_spectators(guild)
             for spec in spectators:
-                if spec.member not in team1_users and spec.member not in team2_users:
+                if spec.discord not in team1_users and spec.discord not in team2_users:
                     match_players.append({'steam_id_64': spec.steam_id, 'team': 'spectator'})
 
             await self.bot.api.update_game_server(
                 game_server.id,
                 len(match_players),
                 game_mode=game_mode,
-                location=location,
-                auth=guild_model.dathost_auth)
+                location=location)
 
             api_key = generate_api_key()
             api_match = await self.bot.api.create_match(
@@ -207,8 +206,7 @@ class MatchCog(commands.Cog, name="Match"):
                 team2_name,
                 match_players,
                 connect_time,
-                api_key,
-                auth=guild_model.dathost_auth,
+                api_key
             )
 
             await message.edit(embed=Embed(description='Setting up teams channels...'), view=None)
@@ -231,9 +229,10 @@ class MatchCog(commands.Cog, name="Match"):
                 'api_key': api_key
             })
 
-            await self.bot.db.insert_match_users(api_match.id, team1_users + team2_users)
-            embed = self.embed_match_info(api_match, game_server)
-            self.add_teams_fields(embed, team1_users, team2_users)
+            aws = [self.bot.db.insert_player_stats(int(u.steam_id)) for u in api_match.team1_players + api_match.team2_players]
+            await asyncio.gather(*aws)
+
+            embed = self.embed_match_info(api_match, game_server, team1_users, team2_users)
 
         except APIError as e:
             description = e.message
@@ -259,9 +258,9 @@ class MatchCog(commands.Cog, name="Match"):
         except:
             pass
 
-    async def find_game_server(self, dathost_auth):
+    async def find_game_server(self):
         """"""
-        game_servers = await self.bot.api.get_game_servers(auth=dathost_auth)
+        game_servers = await self.bot.api.get_game_servers()
 
         for game_server in game_servers:            
             if not await self.bot.db.is_server_in_use(game_server.id):

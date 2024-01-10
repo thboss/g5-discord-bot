@@ -28,13 +28,13 @@ class WebServer:
     async def match_end(self, req):
         self.logger.info(f"Received webhook data from {req.url}")
         api_key = req.headers.get('Authorization').strip('Bearer ')
-        match_model = await self.bot.db.get_match_by_api_key(api_key, self.bot)
-        guild_model = await self.bot.db.get_guild_by_id(match_model.guild.id, self.bot)
+        match_model = await self.bot.db.get_match_by_api_key(api_key)
+        guild_model = await self.bot.db.get_guild_by_id(match_model.guild.id)
         if not match_model or not guild_model:
             return
 
         try:
-            await self.bot.api.stop_game_server(match_model.game_server_id, guild_model.dathost_auth)
+            await self.bot.api.stop_game_server(match_model.game_server_id)
         except:
             pass
 
@@ -56,14 +56,13 @@ class WebServer:
 
         await self.match_cog.finalize_match(match_model, guild_model)
 
-
     async def round_end(self, req):
         self.logger.debug(f"Received webhook data from {req.url}")
         game_server = None
         message = None
-        authorization = req.headers.get('Authorization').strip('Bearer ')
-        match_model = await self.bot.db.get_match_by_api_key(authorization, self.bot)
-        guild_model = await self.bot.db.get_guild_by_id(match_model.guild.id, self.bot)
+        api_key = req.headers.get('Authorization').strip('Bearer ')
+        match_model = await self.bot.db.get_match_by_api_key(api_key)
+        guild_model = await self.bot.db.get_guild_by_id(match_model.guild.id)
         if not match_model or not guild_model:
             return
 
@@ -76,16 +75,13 @@ class WebServer:
             pass
 
         try:
-            game_server = await self.bot.api.get_game_server(match_api.game_server_id, auth=guild_model.dathost_auth)
+            game_server = await self.bot.api.get_game_server(match_api.game_server_id)
         except:
             pass
 
         if message:
             try:
                 embed = self.match_cog.embed_match_info(match_api, game_server)
-                team1_users = await self.bot.db.get_match_users(match_api.id, match_model.guild, team='team1')
-                team2_users = await self.bot.db.get_match_users(match_api.id, match_model.guild, team='team2')
-                self.match_cog.add_teams_fields(embed, team1_users, team2_users)
                 await message.edit(embed=embed)
             except Exception as e:
                 self.logger.error(e, exc_info=1)
@@ -118,7 +114,7 @@ class WebServer:
     async def _update_players_stats(self, team1_stats, team2_stats):
         for player_stat in team1_stats + team2_stats:
             try:
-                player_model = await self.bot.db.get_player_by_steam_id(player_stat.steam_id, self.bot)
+                player_model = await self.bot.db.get_player_by_steam_id(player_stat.steam_id)
                 if player_model:
                     await self.bot.db.update_player_stats(player_model.discord.id, player_stat)
             except Exception as e:
@@ -127,10 +123,10 @@ class WebServer:
     async def _release_match_stats(self, guild_model, match_api, team1_stats, team2_stats):
         try:
             for p in team1_stats:
-                player_model = await self.bot.db.get_player_by_steam_id(p.steam_id, self.bot)
+                player_model = await self.bot.db.get_player_by_steam_id(p.steam_id)
                 p.member = player_model.discord
             for p in team2_stats:
-                player_model = await self.bot.db.get_player_by_steam_id(p.steam_id, self.bot)
+                player_model = await self.bot.db.get_player_by_steam_id(p.steam_id)
                 p.member = player_model.discord
             team1_stats.sort(key=lambda x: x.score, reverse=True)
             team2_stats.sort(key=lambda x: x.score, reverse=True)

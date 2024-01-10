@@ -19,8 +19,8 @@ class LinkCog(commands.Cog, name='Link'):
         await interaction.response.defer(ephemeral=True)
         user = interaction.user
         steam_id = validate_steam(steam)
-        guild_model = await self.bot.db.get_guild_by_id(interaction.guild_id, self.bot)
-        player_model = await self.bot.db.get_player_by_discord_id(user.id, self.bot)
+        guild_model = await self.bot.db.get_guild_by_id(interaction.guild_id)
+        player_model = await self.bot.db.get_player_by_discord_id(user.id)
 
         if player_model:
             user_match = await self.bot.db.get_user_match(user.id, interaction.guild)
@@ -36,9 +36,9 @@ class LinkCog(commands.Cog, name='Link'):
 
         try:
             if not player_model:
-                await self.bot.db.insert_player({'id': user.id, 'steam_id': steam_id})
+                await self.bot.db.insert_player(user.id, int(steam_id))
             else:
-                await self.bot.db.update_player(user.id, {'steam_id': steam_id})
+                await self.bot.db.update_player(user.id, int(steam_id))
         except UniqueViolationError:
             raise CustomError(
                 f"This Steam is linked to another user. Please try different Steam ID.")
