@@ -130,7 +130,7 @@ steps = [
             '    match_id VARCHAR(32) DEFAULT NULL REFERENCES matches (id) ON DELETE CASCADE,\n'
             '    user_id BIGINT DEFAULT NULL REFERENCES users (id) ON DELETE CASCADE,\n'
             '    steam_id BIGINT DEFAULT NULL,\n'
-            '    team VARCHAR(5) DEFAULT NULL,\n'
+            '    team team NOT NULL DEFAULT \'spec\',\n'
             '    kills SMALLINT DEFAULT 0,\n'
             '    deaths SMALLINT DEFAULT 0,\n'
             '    assists SMALLINT DEFAULT 0,\n'

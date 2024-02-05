@@ -54,7 +54,7 @@ class WebServer:
             await self._update_players_stats(team1_stats, team2_stats)
             await self._update_leaderboard(guild_model)
 
-        await self.match_cog.finalize_match(match_model, guild_model)
+        await self.match_cog.finalize_match(match_model, match_api, guild_model)
 
     async def round_end(self, req):
         self.logger.debug(f"Received webhook data from {req.url}")

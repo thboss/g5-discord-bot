@@ -50,7 +50,9 @@ class G5Bot(commands.AutoShardedBot):
     async def on_guild_join(self, guild) -> None:
         """"""
         await self.db.sync_guilds([g.id for g in self.guilds])
-        await self.check_guild_requirements(guild)
+        try:
+            await self.check_guild_requirements(guild)
+        except: pass
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild) -> None:

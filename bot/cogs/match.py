@@ -31,6 +31,7 @@ class MatchCog(commands.Cog, name="Match"):
 
         guild_model = await self.bot.db.get_guild_by_id(interaction.guild.id)
         match_model = await self.bot.db.get_match_by_id(match_id)
+        match_api = await self.bot.api.get_match(match_id)
         if not match_model:
             raise CustomError("Invalid match ID.")
         
@@ -44,7 +45,7 @@ class MatchCog(commands.Cog, name="Match"):
         except:
             pass
         
-        await self.finalize_match(match_model, guild_model)
+        await self.finalize_match(match_model, match_api, guild_model)
 
         embed = Embed(description=f"Match #{match_id} cancelled successfully.")
         await interaction.followup.send(embed=embed)
@@ -113,7 +114,7 @@ class MatchCog(commands.Cog, name="Match"):
             description += f'📌 **Server:** `connect {game_server.ip}:{game_server.port}`\n' \
                            f'⚙️ **Game mode:** {game_server.game_mode}\n'
 
-        description += f'🗺️ **Map:** {match_stats.map}\n\n'
+        description += f'🗺️ **Map:** {match_stats.map_name}\n\n'
         embed = Embed(title=title, description=description)
 
         author_name = f"🟢 Match #{match_stats.id}"
@@ -229,10 +230,14 @@ class MatchCog(commands.Cog, name="Match"):
                 'api_key': api_key
             })
 
-            aws = [self.bot.db.insert_player_stats(int(u.steam_id)) for u in api_match.team1_players + api_match.team2_players]
+            aws = []
+            for u in team1_players_model:
+                aws.append(self.bot.db.insert_player_stats(api_match.id, u.steam_id, u.discord.id, 'team1'))
+            for u in team2_players_model:
+                aws.append(self.bot.db.insert_player_stats(api_match.id, u.steam_id, u.discord.id, 'team2'))
             await asyncio.gather(*aws)
 
-            embed = self.embed_match_info(api_match, game_server, team1_users, team2_users)
+            embed = self.embed_match_info(api_match, team1_users, team2_users, game_server)
 
         except APIError as e:
             description = e.message
@@ -305,10 +310,10 @@ class MatchCog(commands.Cog, name="Match"):
 
         return match_catg, team1_channel, team2_channel
 
-    async def finalize_match(self, match_model: MatchModel, guild_model: GuildModel):
+    async def finalize_match(self, match_model: MatchModel, match_api: Match, guild_model: GuildModel):
         """"""
-        match_players = await self.bot.db.get_match_users(match_model.id, match_model.guild)
-        move_aws = [user.move_to(guild_model.waiting_channel) for user in match_players]
+        move_aws = [user.move_to(guild_model.waiting_channel)
+                    for user in match_model.team1_channel.members + match_model.team2_channel.members]
         await asyncio.gather(*move_aws, return_exceptions=True)
         
         team_channels = [
@@ -320,10 +325,10 @@ class MatchCog(commands.Cog, name="Match"):
         for channel in team_channels:
             try:
                 await channel.delete()
-            except:
-                pass
-
-        await self.bot.db.delete_match(match_model.id)
+            except: pass
+        
+        if match_api.canceled:
+            await self.bot.db.delete_match(match_model.id)
 
 
 async def setup(bot):

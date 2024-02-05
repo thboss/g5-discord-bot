@@ -2,7 +2,7 @@
 
 import asyncpg
 import logging
-from typing import List, Union, Optional
+from typing import List, Literal, Union, Optional
 
 import discord
 
@@ -362,18 +362,12 @@ class DBManager:
 
         return await self.query(sql, user_id, match_id)
     
-    async def insert_player_stats(self, user_id: int, stats: MatchPlayer):
+    async def insert_player_stats(self, match_id: str, steam_id: int, user_id: int, team: Literal["team1", "team2"]):
         """"""
-        dict_stats = stats.to_dict()
-        dict_stats['user_id'] = user_id
+        sql = f"INSERT INTO player_stats (match_id, steam_id, user_id, team)\n" \
+            f"    VALUES($1, $2, $3, $4);"
 
-        cols = ", ".join(col for col in dict_stats)
-        vals = ", ".join(f"'{val}'" if type(val) is
-                         str else str(val) for val in dict_stats.values())
-        sql = f"INSERT INTO player_stats ({cols})\n" \
-            f"    VALUES({vals});"
-
-        await self.query(sql)
+        await self.query(sql, match_id, steam_id, user_id, team)
     
     async def update_player_stats(self, user_id: int, stats: MatchPlayer):
         """"""

@@ -3,7 +3,6 @@
 import discord
 
 from typing import Optional
-from aiohttp import BasicAuth
 
 
 class GuildModel:
