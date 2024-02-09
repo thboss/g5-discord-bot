@@ -64,12 +64,17 @@ class Match:
         self.connect_time = match_data['settings']['connect_time']
         self.map_name = match_data['settings']['map']
         self.rounds_played = match_data['rounds_played']
-        self.team1_players = [MatchPlayer.from_dict(player) for player in match_data['players'] if player['team'] == 'team1']
-        self.team2_players = [MatchPlayer.from_dict(player) for player in match_data['players'] if player['team'] == 'team2']
+        self.players = [MatchPlayer.from_dict(player) for player in match_data['players']]
 
     @classmethod
     def from_dict(cls, data: dict) -> "Match":
         return cls(data)
+    
+    @property
+    def winner(self):
+        if self.canceled or not self.finished:
+            return
+        return 'team1' if self.team1_score > self.team2_score else 'team2'
     
     @property
     def to_dict(self):
@@ -84,7 +89,8 @@ class Match:
             'finished': self.finished,
             'map_name': self.map_name,
             'connect_time': self.connect_time,
-            'rounds_played': self.rounds_played
+            'rounds_played': self.rounds_played,
+            'winner': self.winner
         }
 
 

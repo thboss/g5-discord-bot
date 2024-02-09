@@ -110,6 +110,7 @@ steps = [
             '    connect_time SMALLINT NOT NULL DEFAULT 300,\n'
             '    canceled BOOL NOT NULL DEFAULT false,\n'
             '    finished BOOL NOT NULL DEFAULT false,\n'
+            '    winner team DEFAULT NULL,\n'
             '    api_key VARCHAR(32) DEFAULT NULL\n'
             ');'
         ),
