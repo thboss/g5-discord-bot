@@ -2,7 +2,7 @@ import secrets
 import string
 from steam import steamid
 from PIL import Image, ImageFont, ImageDraw
-from discord import File
+from discord import File, Embed
 import os
 
 from .errors import CustomError
@@ -12,27 +12,6 @@ ABS_ROOT_DIR = os.path.abspath(os.curdir)
 TEMPLATES_DIR = os.path.join(ABS_ROOT_DIR, 'assets', 'img', 'templates')
 FONTS_DIR = os.path.join(ABS_ROOT_DIR, 'assets', 'fonts')
 SAVE_IMG_DIR = os.path.join(ABS_ROOT_DIR, 'assets', 'img')
-
-
-COUNTRY_FLAGS = [
-    'AD', 'AE', 'AF', 'AG', 'AI', 'AL', 'AM', 'AO', 'AQ', 'AR', 'AS', 'AT', 'AU', 'AW', 'AX',
-    'AZ', 'BA', 'BB', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BL', 'BM', 'BN', 'BO', 'BQ',
-    'BR', 'BS', 'BT', 'BV', 'BW', 'BY', 'BZ', 'CA', 'CC', 'CD', 'CF', 'CG', 'CH', 'CI', 'CK',
-    'CL', 'CM', 'CN', 'CO', 'CR', 'CU', 'CV', 'CW', 'CX', 'CY', 'CZ', 'DE', 'DJ', 'DK', 'DM',
-    'DO', 'DZ', 'EC', 'EE', 'EG', 'EH', 'ER', 'ES', 'ET', 'FI', 'FJ', 'FK', 'FM', 'FO', 'FR',
-    'GA', 'GB', 'GD', 'GE', 'GF', 'GG', 'GH', 'GI', 'GL', 'GM', 'GN', 'GP', 'GQ', 'GR', 'GS',
-    'GT', 'GU', 'GW', 'GY', 'HK', 'HM', 'HN', 'HR', 'HT', 'HU', 'ID', 'IE', 'IL', 'IM', 'IN',
-    'IO', 'IQ', 'IR', 'IS', 'IT', 'JE', 'JM', 'JO', 'JP', 'KE', 'KG', 'KH', 'KI', 'KM', 'KN',
-    'KP', 'KR', 'KW', 'KY', 'KZ', 'LA', 'LB', 'LC', 'LI', 'LK', 'LR', 'LS', 'LT', 'LU', 'LV',
-    'LY', 'MA', 'MC', 'MD', 'ME', 'MF', 'MG', 'MH', 'MK', 'ML', 'MM', 'MN', 'MO', 'MP', 'MQ',
-    'MR', 'MS', 'MT', 'MU', 'MV', 'MW', 'MX', 'MY', 'MZ', 'NA', 'NC', 'NE', 'NF', 'NG', 'NI',
-    'NL', 'NO', 'NP', 'NR', 'NU', 'NZ', 'OM', 'PA', 'PE', 'PF', 'PG', 'PH', 'PK', 'PL', 'PM',
-    'PN', 'PR', 'PS', 'PT', 'PW', 'PY', 'QA', 'RE', 'RO', 'RS', 'RU', 'RW', 'SA', 'SB', 'SC',
-    'SD', 'SE', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'SM', 'SN', 'SO', 'SR', 'SS', 'ST', 'SV',
-    'SX', 'SY', 'SZ', 'TC', 'TD', 'TF', 'TG', 'TH', 'TJ', 'TK', 'TL', 'TM', 'TN', 'TO', 'TR',
-    'TT', 'TV', 'TW', 'TZ', 'UA', 'UG', 'UM', 'US', 'UY', 'UZ', 'VA', 'VC', 'VE', 'VG', 'VI',
-    'VN', 'VU', 'WF', 'WS', 'YE', 'YT', 'ZA', 'ZM', 'ZW'
-]
 
 
 GAME_SERVER_LOCATIONS = {
@@ -173,29 +152,32 @@ def generate_scoreboard_img(match_stats, team1_stats, team2_stats):
         title_width = title_box[2] - title_box[0]
         draw.text(((width - title_width) // 2, 40), title, font=fontbig)
 
-        map_name = f"Map: {match_stats.map}"
+        map_name = f"Map: {match_stats.map_name}"
         map_box = draw.textbbox((0, 0), map_name, font=fontbig)
         map_width = map_box[2] - map_box[0]
         draw.text(((width - map_width) // 2, 85), map_name, font=fontbig)
 
         draw.text((200, 170), match_stats.team1_name[:20], font=fontbig)
         for idx, p in enumerate(team1_stats):
-            draw.text((58, 290+50*idx), str(p.member.display_name)[:14], font=font)
-            draw.text((340, 290+50*idx), str(p.kills), font=font)
-            draw.text((490, 290+50*idx), str(p.assists), font=font)
-            draw.text((640, 290+50*idx), str(p.deaths), font=font)
-            draw.text((790, 290+50*idx), str(p.mvps), font=font)
-            draw.text((900, 290+50*idx), str(p.score), font=font)
+            draw.text((58, 290+50*idx), str(p.discord.display_name)[:14], font=font)
+            draw.text((340, 290+50*idx), str(team1_stats[p].kills), font=font)
+            draw.text((490, 290+50*idx), str(team1_stats[p].assists), font=font)
+            draw.text((640, 290+50*idx), str(team1_stats[p].deaths), font=font)
+            draw.text((790, 290+50*idx), str(team1_stats[p].mvps), font=font)
+            draw.text((900, 290+50*idx), str(team1_stats[p].score), font=font)
     
         draw.text((200, 615), match_stats.team2_name[:20], font=fontbig)
         for idx, p in enumerate(team2_stats):
-            draw.text((58, 748+50*idx), str(p.member.display_name)[:14], font=font)
-            draw.text((340, 748+50*idx), str(p.kills), font=font)
-            draw.text((490, 748+50*idx), str(p.assists), font=font)
-            draw.text((640, 748+50*idx), str(p.deaths), font=font)
-            draw.text((790, 748+50*idx), str(p.mvps), font=font)
-            draw.text((900, 748+50*idx), str(p.score), font=font)
+            draw.text((58, 748+50*idx), str(p.discord.display_name)[:14], font=font)
+            draw.text((340, 748+50*idx), str(team2_stats[p].kills), font=font)
+            draw.text((490, 748+50*idx), str(team2_stats[p].assists), font=font)
+            draw.text((640, 748+50*idx), str(team2_stats[p].deaths), font=font)
+            draw.text((790, 748+50*idx), str(team2_stats[p].mvps), font=font)
+            draw.text((900, 748+50*idx), str(team2_stats[p].score), font=font)
 
         img.save(SAVE_IMG_DIR + '/scoreboard.png')
 
     return File(SAVE_IMG_DIR + '/scoreboard.png')
+
+def set_scoreboard_image(embed: Embed):
+    embed.set_image(url=f"attachment://{SAVE_IMG_DIR}/scoreboard.png")

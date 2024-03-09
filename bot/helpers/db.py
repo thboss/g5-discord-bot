@@ -105,11 +105,13 @@ class DBManager:
 
     async def update_match(self, match_stats: Match) -> None:
         """"""
-        dict_stats = match_stats.to_dict()
+        dict_stats = match_stats.to_dict
+        dict_stats.pop('players')
+        dict_stats = {key: f"'{value}'" if isinstance(value, str) else value for key, value in dict_stats.items()}
         col_vals = ",\n    ".join(
-            f"{key} = {val}" for key, val in dict_stats.items())
+            f"{key} = {val}" for key, val in dict_stats.items()
+        )
         sql = f"UPDATE matches SET {col_vals} WHERE id = $1;"
-
         await self.query(sql, match_stats.id)
 
     async def delete_match(self, match_id: str) -> None:
@@ -136,7 +138,7 @@ class DBManager:
             user = self.bot.get_user(user_id)
             return PlayerModel.from_dict(data[0], user)
 
-    async def get_player_by_steam_id(self, steam_id: str) -> Optional[PlayerModel]:
+    async def get_player_by_steam_id(self, steam_id: int) -> Optional[PlayerModel]:
         """"""
         sql = "SELECT * FROM users\n" \
             f"    WHERE steam_id = $1;"
@@ -362,18 +364,23 @@ class DBManager:
 
         return await self.query(sql, user_id, match_id)
     
-    async def insert_player_stats(self, match_id: str, steam_id: int, user_id: int, team: Literal["team1", "team2"]):
+    async def insert_players_stats(self, players_stats: List[dict]):
         """"""
-        sql = f"INSERT INTO player_stats (match_id, steam_id, user_id, team)\n" \
-            f"    VALUES($1, $2, $3, $4);"
-
-        await self.query(sql, match_id, steam_id, user_id, team)
+        values =",\n".join(f"('{ps['match_id']}', {ps['steam_id']}, {ps['user_id']}, '{ps['team']}')"
+                           for ps in players_stats)
+        sql = f"INSERT INTO player_stats (match_id, steam_id, user_id, team) VALUES {values};"
+        await self.query(sql)
     
     async def update_player_stats(self, user_id: int, stats: MatchPlayer):
         """"""
-        dict_stats = stats.to_dict()
+        dict_stats = stats.to_dict
+        dict_stats.pop('match_id')
+        dict_stats.pop('steam_id')
+        dict_stats.pop('team')
+        dict_stats = {key: f"'{value}'" if isinstance(value, str) else value for key, value in dict_stats.items()}
         col_vals = ",\n    ".join(
-            f"{key} = {val}" for key, val in dict_stats.items())
+            f"{key} = {val}" for key, val in dict_stats.items()
+        )
 
         sql = f'UPDATE player_stats SET {col_vals} WHERE user_id = $1 AND match_id = $2;'
         await self.query(sql, user_id, stats.match_id)

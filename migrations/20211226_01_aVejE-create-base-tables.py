@@ -24,7 +24,7 @@ steps = [
         'DROP TYPE game_mode;'
     ),
     step(
-        'CREATE TYPE team AS ENUM(\'team1\', \'team2\', \'spec\');',
+        'CREATE TYPE team AS ENUM(\'team1\', \'team2\', \'spec\', \'none\');',
         'DROP TYPE team;'
     ),
     step(
@@ -110,7 +110,7 @@ steps = [
             '    connect_time SMALLINT NOT NULL DEFAULT 300,\n'
             '    canceled BOOL NOT NULL DEFAULT false,\n'
             '    finished BOOL NOT NULL DEFAULT false,\n'
-            '    winner team DEFAULT NULL,\n'
+            '    winner team NOT NULL DEFAULT \'none\',\n'
             '    api_key VARCHAR(32) DEFAULT NULL\n'
             ');'
         ),
@@ -131,7 +131,7 @@ steps = [
             '    match_id VARCHAR(32) DEFAULT NULL REFERENCES matches (id) ON DELETE CASCADE,\n'
             '    user_id BIGINT DEFAULT NULL REFERENCES users (id) ON DELETE CASCADE,\n'
             '    steam_id BIGINT DEFAULT NULL,\n'
-            '    team team NOT NULL DEFAULT \'spec\',\n'
+            '    team team NOT NULL DEFAULT \'none\',\n'
             '    kills SMALLINT DEFAULT 0,\n'
             '    deaths SMALLINT DEFAULT 0,\n'
             '    assists SMALLINT DEFAULT 0,\n'

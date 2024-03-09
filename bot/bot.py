@@ -25,12 +25,13 @@ class G5Bot(commands.AutoShardedBot):
         self.tree.on_error = on_app_command_error
         self.db: DBManager = DBManager(self)
         self.api: APIManager = APIManager(self)
-        self.webserver: WebServer = WebServer(self)
+        self.webserver: WebServer = None
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
         await self.db.connect()
         self.api.connect(self.loop)
+        self.webserver = WebServer(self)
         await self.webserver.start_webhook_server()
 
         #  Sync guilds' information with the database.

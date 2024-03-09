@@ -8,7 +8,7 @@ from random import choice, shuffle
 import asyncio
 
 from bot.helpers.api import Match
-from bot.helpers.utils import generate_api_key
+from bot.helpers.utils import generate_api_key, generate_scoreboard_img, set_scoreboard_image
 from bot.helpers.models import GuildModel, MatchModel
 from bot.bot import G5Bot
 from bot.helpers.errors import APIError, CustomError
@@ -31,7 +31,6 @@ class MatchCog(commands.Cog, name="Match"):
 
         guild_model = await self.bot.db.get_guild_by_id(interaction.guild.id)
         match_model = await self.bot.db.get_match_by_id(match_id)
-        match_api = await self.bot.api.get_match(match_id)
         if not match_model:
             raise CustomError("Invalid match ID.")
         
@@ -45,6 +44,7 @@ class MatchCog(commands.Cog, name="Match"):
         except:
             pass
         
+        match_api = await self.bot.api.get_match(match_id)
         await self.finalize_match(match_model, match_api, guild_model)
 
         embed = Embed(description=f"Match #{match_id} cancelled successfully.")
@@ -102,8 +102,6 @@ class MatchCog(commands.Cog, name="Match"):
     def embed_match_info(
         self,
         match_stats: Match,
-        team1_users: List[Member],
-        team2_users: List[Member],
         game_server=None,
     ):
         """"""
@@ -119,12 +117,6 @@ class MatchCog(commands.Cog, name="Match"):
 
         author_name = f"🟢 Match #{match_stats.id}"
         embed.set_author(name=author_name)
-
-        embed.add_field(name="Team 1", value="\n".join(f'{u.mention}' 
-            for u in team1_users), inline=False)
-        
-        embed.add_field(name="Team 2", value="\n".join(f'{u.mention}' 
-            for u in team2_users), inline=False)
 
         if self.bot.user.avatar:
             embed.set_thumbnail(url=self.bot.user.avatar.url)
@@ -227,17 +219,22 @@ class MatchCog(commands.Cog, name="Match"):
                 'category': category.id,
                 'team1_channel': team1_channel.id,
                 'team2_channel': team2_channel.id,
-                'api_key': api_key
+                'team1_name': team1_name,
+                'team2_name': team2_name,
+                'map_name': map_name,
+                'api_key': api_key,
+                'connect_time': api_match.connect_time
             })
 
-            aws = []
-            for u in team1_players_model:
-                aws.append(self.bot.db.insert_player_stats(api_match.id, u.steam_id, u.discord.id, 'team1'))
-            for u in team2_players_model:
-                aws.append(self.bot.db.insert_player_stats(api_match.id, u.steam_id, u.discord.id, 'team2'))
-            await asyncio.gather(*aws)
+            players_stats = []
+            for u in team1_players_model + team2_players_model:
+                players_stats.append({'match_id': api_match.id,
+                                      'steam_id': u.steam_id,
+                                      'user_id': u.discord.id,
+                                      'team': 'team1' if u.discord in team1_users else 'team2'})
+            await self.bot.db.insert_players_stats(players_stats)
 
-            embed = self.embed_match_info(api_match, team1_users, team2_users, game_server)
+            embed = self.embed_match_info(api_match, game_server)
 
         except APIError as e:
             description = e.message
@@ -250,9 +247,19 @@ class MatchCog(commands.Cog, name="Match"):
             description = 'Something went wrong! See logs for details'
         else:
             try:
-                await message.edit(embed=embed, view=None)
-            except:
-                pass
+                team1_stats = {
+                    player_model: next(player_stat for player_stat in api_match.players if player_model.steam_id == player_stat.steam_id)
+                    for player_model in team1_players_model
+                }
+                team2_stats = {
+                    player_model: next(player_stat for player_stat in api_match.players if player_model.steam_id == player_stat.steam_id)
+                    for player_model in team2_players_model
+                }
+                file = generate_scoreboard_img(api_match, team1_stats, team2_stats)
+                set_scoreboard_image(embed)
+                await message.edit(embed=embed, view=None, attachments=[file])
+            except Exception as e:
+                self.bot.logger.error(e, exc_info=1)
 
             return True
 
@@ -268,7 +275,7 @@ class MatchCog(commands.Cog, name="Match"):
         game_servers = await self.bot.api.get_game_servers()
 
         for game_server in game_servers:            
-            if not await self.bot.db.is_server_in_use(game_server.id):
+            if not game_server.match_id:
                 return game_server
 
         raise ValueError("No game server available at the moment.")
@@ -312,9 +319,12 @@ class MatchCog(commands.Cog, name="Match"):
 
     async def finalize_match(self, match_model: MatchModel, match_api: Match, guild_model: GuildModel):
         """"""
-        move_aws = [user.move_to(guild_model.waiting_channel)
-                    for user in match_model.team1_channel.members + match_model.team2_channel.members]
-        await asyncio.gather(*move_aws, return_exceptions=True)
+        try:
+            move_aws = [user.move_to(guild_model.waiting_channel)
+                        for user in match_model.team1_channel.members + match_model.team2_channel.members]
+            await asyncio.gather(*move_aws, return_exceptions=True)
+        except Exception as e:
+            self.bot.logger.error(e, exc_info=1)
         
         team_channels = [
             match_model.team2_channel,
@@ -325,10 +335,16 @@ class MatchCog(commands.Cog, name="Match"):
         for channel in team_channels:
             try:
                 await channel.delete()
-            except: pass
+            except Exception as e:
+                self.bot.logger.error(e, exc_info=1)
+
+        try:
+            message = await match_model.text_channel.fetch_message(match_model.message_id)
+            await message.delete()
+        except Exception as e:
+            self.bot.logger.error(e, exc_info=1)
         
-        if match_api.canceled:
-            await self.bot.db.delete_match(match_model.id)
+        await self.bot.db.update_match(match_api)
 
 
 async def setup(bot):

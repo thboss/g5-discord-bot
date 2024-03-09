@@ -29,59 +29,56 @@ class WebServer:
         self.logger.info(f"Received webhook data from {req.url}")
         api_key = req.headers.get('Authorization').strip('Bearer ')
         match_model = await self.bot.db.get_match_by_api_key(api_key)
-        guild_model = await self.bot.db.get_guild_by_id(match_model.guild.id)
-        if not match_model or not guild_model:
+        resp_data = await req.json()
+        match_api = Match.from_dict(resp_data)
+        if not match_model or not match_api:
             return
 
         try:
             await self.bot.api.stop_game_server(match_model.game_server_id)
-        except:
-            pass
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
 
-        try:
-            message = await match_model.text_channel.fetch_message(match_model.message_id)
-            await message.delete()
-        except:
-            pass
-        
-        resp_data = await req.json()
-        match_api = Match.from_dict(resp_data)
-
-        # if not match_api.canceled:
-        #     await self.bot.db.update_match(match_api)
-        #     await self._update_leaderboard(guild_model)
-
+        guild_model = await self.bot.db.get_guild_by_id(match_model.guild.id)
+        match_api = await self.bot.api.get_match(match_model.id)
         await self.match_cog.finalize_match(match_model, match_api, guild_model)
 
     async def round_end(self, req):
         self.logger.debug(f"Received webhook data from {req.url}")
-        # game_server = None
-        # message = None
-        # api_key = req.headers.get('Authorization').strip('Bearer ')
-        # match_model = await self.bot.db.get_match_by_api_key(api_key)
+        game_server = None
+        message = None
+        api_key = req.headers.get('Authorization').strip('Bearer ')
+        match_model = await self.bot.db.get_match_by_api_key(api_key)
+        resp_data = await req.json()
+        match_api = Match.from_dict(resp_data)
         # guild_model = await self.bot.db.get_guild_by_id(match_model.guild.id)
-        # if not match_model or not guild_model:
-        #     return
+        if not match_model or not match_api:
+            return
 
-        # resp_data = await req.json()
-        # match_api = Match.from_dict(resp_data)
+        for player_stat in match_api.players:
+            try:
+                player_model = await self.bot.db.get_player_by_steam_id(player_stat.steam_id)
+                if player_model:
+                    await self.bot.db.update_player_stats(player_model.discord.id, player_stat)
+            except Exception as e:
+                self.logger.error(e, exc_info=1)
 
-        # try:
-        #     message = await match_model.text_channel.fetch_message(match_model.message_id)
-        # except:
-        #     pass
+        try:
+            message = await match_model.text_channel.fetch_message(match_model.message_id)
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
 
-        # try:
-        #     game_server = await self.bot.api.get_game_server(match_api.game_server_id)
-        # except:
-        #     pass
+        try:
+            game_server = await self.bot.api.get_game_server(match_api.game_server_id)
+        except Exception as e:
+            self.logger.error(e, exc_info=1)
 
-        # if message:
-        #     try:
-        #         embed = self.match_cog.embed_match_info(match_api, game_server)
-        #         await message.edit(embed=embed)
-        #     except Exception as e:
-        #         self.logger.error(e, exc_info=1)
+        if message:
+            try:
+                embed = self.match_cog.embed_match_info(match_api, game_server)
+                await message.edit(embed=embed)
+            except Exception as e:
+                self.logger.error(e, exc_info=1)
 
 
     async def _update_leaderboard(self, guild_model):

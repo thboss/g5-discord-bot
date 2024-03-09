@@ -12,7 +12,7 @@ from bot.helpers.errors import APIError
 class MatchPlayer:
     def __init__(self, data):
         self.match_id = data['match_id']
-        self.steam_id = data['steam_id_64']
+        self.steam_id = int(data['steam_id_64'])
         self.team = data['team']
         self.kills = data['stats']['kills']
         self.assists = data['stats']['assists']
@@ -73,11 +73,11 @@ class Match:
     @property
     def winner(self):
         if self.canceled or not self.finished:
-            return
+            return 'none'
         return 'team1' if self.team1_score > self.team2_score else 'team2'
     
     @property
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
             'id': self.id,
             'game_server_id': self.game_server_id,
@@ -90,6 +90,7 @@ class Match:
             'map_name': self.map_name,
             'connect_time': self.connect_time,
             'rounds_played': self.rounds_played,
+            'players': self.players,
             'winner': self.winner
         }
 
@@ -106,6 +107,7 @@ class GameServer:
         self.gotv_port = data['ports']['gotv']
         self.on = data['on']
         self.game_mode = data['cs2_settings']['game_mode']
+        self.match_id = data['match_id']
 
     @classmethod
     def from_dict(cls, data: dict) -> "GameServer":
