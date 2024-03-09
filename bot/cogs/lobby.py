@@ -320,6 +320,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
                     match_started = await match_cog.start_match(
                         lobby_model.guild,
                         setup_msg,
+                        lobby_model.voice_channel,
                         queue_users=lobby_users,
                         team_method=lobby_model.team_method,
                         captain_method=lobby_model.captain_method,

@@ -80,55 +80,6 @@ class WebServer:
             except Exception as e:
                 self.logger.error(e, exc_info=1)
 
-
-    async def _update_leaderboard(self, guild_model):
-        """"""
-        leaderboard_channel = guild_model.leaderboard_channel
-        if not leaderboard_channel:
-            return
-
-        try:
-            await leaderboard_channel.purge()
-        except:
-            pass
-        
-        try:
-            leaderboard = await self.bot.db.get_players(guild_model.guild.members)
-            leaderboard.sort(key=lambda u: u.elo, reverse=True)
-            leaderboard = list(filter(lambda u: u.played_matches != 0, leaderboard))
-            if leaderboard:
-                try:
-                    file = generate_leaderboard_img(leaderboard[:10])
-                    await leaderboard_channel.send(file=file)
-                except Exception as e:
-                    self.bot.logger.error(e, exc_info=1)
-        except:
-            pass
-
-    async def _update_players_stats(self, team1_stats, team2_stats):
-        for player_stat in team1_stats + team2_stats:
-            try:
-                player_model = await self.bot.db.get_player_by_steam_id(player_stat.steam_id)
-                if player_model:
-                    await self.bot.db.update_player_stats(player_model.discord.id, player_stat)
-            except Exception as e:
-                self.logger.error(e, exc_info=1)
-
-    async def _release_match_stats(self, guild_model, match_api, players_stats):
-        try:
-            for p in team1_stats:
-                player_model = await self.bot.db.get_player_by_steam_id(p.steam_id)
-                p.member = player_model.discord
-            for p in team2_stats:
-                player_model = await self.bot.db.get_player_by_steam_id(p.steam_id)
-                p.member = player_model.discord
-            team1_stats.sort(key=lambda x: x.score, reverse=True)
-            team2_stats.sort(key=lambda x: x.score, reverse=True)
-            file = generate_scoreboard_img(match_api, team1_stats[:6], team2_stats[:6])
-            await guild_model.results_channel.send(file=file)
-        except Exception as e:
-            self.logger.error(e, exc_info=1)
-
     async def start_webhook_server(self):
         if self.server_running:
             self.logger.warning("Webhook server is already running.")

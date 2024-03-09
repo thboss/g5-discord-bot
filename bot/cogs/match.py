@@ -1,7 +1,7 @@
 # match.py
 
 from discord.ext import commands
-from discord import Embed, Member, Message, Guild, PermissionOverwrite, app_commands, Interaction
+from discord import Embed, Member, Message, Guild, PermissionOverwrite, VoiceChannel, app_commands, Interaction
 from typing import List
 
 from random import choice, shuffle
@@ -132,6 +132,7 @@ class MatchCog(commands.Cog, name="Match"):
         self,
         guild: Guild,
         message: Message,
+        channel: VoiceChannel,
         queue_users: List[Member]=[], 
         team_method: str='captains',
         map_method: str='veto',
@@ -214,8 +215,7 @@ class MatchCog(commands.Cog, name="Match"):
                 'id': api_match.id,
                 'game_server_id': game_server.id,
                 'guild': guild.id,
-                'channel': message.channel.id,
-                'message': message.id,
+                'channel': channel.id,
                 'category': category.id,
                 'team1_channel': team1_channel.id,
                 'team2_channel': team2_channel.id,
@@ -234,8 +234,6 @@ class MatchCog(commands.Cog, name="Match"):
                                       'team': 'team1' if u.discord in team1_users else 'team2'})
             await self.bot.db.insert_players_stats(players_stats)
 
-            embed = self.embed_match_info(api_match, game_server)
-
         except APIError as e:
             description = e.message
         except asyncio.TimeoutError:
@@ -247,6 +245,12 @@ class MatchCog(commands.Cog, name="Match"):
             description = 'Something went wrong! See logs for details'
         else:
             try:
+                await message.delete()
+            except:
+                pass
+
+            embed = self.embed_match_info(api_match, game_server)
+            try:
                 team1_stats = {
                     player_model: next(player_stat for player_stat in api_match.players if player_model.steam_id == player_stat.steam_id)
                     for player_model in team1_players_model
@@ -256,8 +260,9 @@ class MatchCog(commands.Cog, name="Match"):
                     for player_model in team2_players_model
                 }
                 file = generate_scoreboard_img(api_match, team1_stats, team2_stats)
-                set_scoreboard_image(embed)
-                await message.edit(embed=embed, view=None, attachments=[file])
+                embed = set_scoreboard_image(embed)
+                match_msg = await channel.send(file=file, embed=embed)
+                await self.bot.db.update_match(api_match.id, message=match_msg.id)
             except Exception as e:
                 self.bot.logger.error(e, exc_info=1)
 
@@ -343,8 +348,11 @@ class MatchCog(commands.Cog, name="Match"):
             await message.delete()
         except Exception as e:
             self.bot.logger.error(e, exc_info=1)
+
+        dict_stats = match_api.to_dict
+        dict_stats.pop('players')
         
-        await self.bot.db.update_match(match_api)
+        await self.bot.db.update_match(match_api.id, **dict_stats)
 
 
 async def setup(bot):

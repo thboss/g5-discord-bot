@@ -99,7 +99,7 @@ def generate_statistics_img(user: Member, stats: PlayerStatsModel):
 
         img.save(SAVE_IMG_DIR + '/statistics.png')
 
-    return File(SAVE_IMG_DIR + '/statistics.png')
+    return File(SAVE_IMG_DIR + '/statistics.png', filename="statistics.png")
 
 
 def generate_leaderboard_img(players_stats):
@@ -120,7 +120,7 @@ def generate_leaderboard_img(players_stats):
 
         img.save(SAVE_IMG_DIR + '/leaderboard.png')
 
-    return File(SAVE_IMG_DIR + '/leaderboard.png')
+    return File(SAVE_IMG_DIR + '/leaderboard.png', filename='leaderboard.png')
 
 
 def generate_scoreboard_img(match_stats, team1_stats, team2_stats):
@@ -162,7 +162,12 @@ def generate_scoreboard_img(match_stats, team1_stats, team2_stats):
 
         img.save(SAVE_IMG_DIR + '/scoreboard.png')
 
-    return File(SAVE_IMG_DIR + '/scoreboard.png')
+    return File(SAVE_IMG_DIR + '/scoreboard.png', filename="scoreboard.png")
+
 
 def set_scoreboard_image(embed: Embed):
-    embed.set_image(url=f"attachment://{SAVE_IMG_DIR}/scoreboard.png")
+    return embed.set_image(url=f"attachment://{SAVE_IMG_DIR}/scoreboard.png")
+
+
+def set_statistics_image(embed: Embed):
+    return embed.set_image(url=f"attachment://{SAVE_IMG_DIR}/statistics.png")

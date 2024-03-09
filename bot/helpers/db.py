@@ -102,16 +102,14 @@ class DBManager:
 
         await self.query(sql)
 
-    async def update_match(self, match_stats: Match) -> None:
+    async def update_match(self, match_id: str, **kwargs) -> None:
         """"""
-        dict_stats = match_stats.to_dict
-        dict_stats.pop('players')
-        dict_stats = {key: f"'{value}'" if isinstance(value, str) else value for key, value in dict_stats.items()}
+        dict_stats = {key: f"'{value}'" if isinstance(value, str) else value for key, value in kwargs.items()}
         col_vals = ",\n    ".join(
             f"{key} = {val}" for key, val in dict_stats.items()
         )
         sql = f"UPDATE matches SET {col_vals} WHERE id = $1;"
-        await self.query(sql, match_stats.id)
+        await self.query(sql, match_id)
 
     async def delete_match(self, match_id: str) -> None:
         """"""

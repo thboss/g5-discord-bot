@@ -1,5 +1,6 @@
 # link.py
 
+import os
 from typing import Optional
 
 from discord.ext import commands
@@ -8,7 +9,7 @@ from discord import app_commands, Interaction, Member, Embed
 from bot.bot import G5Bot
 from bot.helpers.errors import CustomError
 from bot.views import ConfirmView
-from bot.helpers.utils import generate_statistics_img
+from bot.helpers.utils import generate_statistics_img, set_statistics_image
 
 
 class StatsCog(commands.Cog, name='Stats'):
@@ -30,7 +31,9 @@ class StatsCog(commands.Cog, name='Stats'):
         
         try:
             file = generate_statistics_img(user, player_stats)
-            await interaction.followup.send(file=file)
+            embed = Embed()
+            embed = set_statistics_image(embed)
+            await interaction.followup.send(file=file, embed=embed)
         except Exception as e:
             self.bot.logger.error(e, exc_info=1)
 
