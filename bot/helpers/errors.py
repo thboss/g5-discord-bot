@@ -55,7 +55,7 @@ async def on_app_command_error(interaction: Interaction, error: app_commands.App
             + "` to fully perform this command!"
     else:
         logger = logging.getLogger('Bot')
-        description = "Something went wrong, see logs for more details."
+        description = "Something went wrong, check logs for more details."
         logger.error(f'Unhandled exception in "/{interaction.command.name}" command: ', error, exc_info=1)
         
     embed = Embed(description=description, color=0xE02B2B)

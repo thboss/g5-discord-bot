@@ -2,8 +2,10 @@ import secrets
 import string
 from steam import steamid
 from PIL import Image, ImageFont, ImageDraw
-from discord import File, Embed
+from discord import File, Embed, Member
 import os
+
+from bot.helpers.models.playerstats import PlayerStatsModel
 
 from .errors import CustomError
 
@@ -66,29 +68,13 @@ def indent(string, n=4):
     return indent + string.replace('\n', '\n' + indent)
 
 
-def calculate_elo(stats, old_elo=1000):
-    weight = max(2 - 0.1 * ((old_elo - 800) / 100), 0.1)
-    winner = 1 if stats.winner else -1
-    new_elo = old_elo + round((
-        stats.kills +
-        stats.assists * 0.5 +
-        stats.k2 * 2 +
-        stats.k3 * 3 +
-        stats.k4 * 4 +
-        stats.k5 * 5 +
-        winner * 5) * weight - \
-        stats.deaths)
-    
-    return new_elo
-
-
 def generate_api_key(length=32):
     alphabet = string.ascii_letters + string.digits
     api_key = ''.join(secrets.choice(alphabet) for _ in range(length))
     return api_key.upper()
 
 
-def generate_statistics_img(stats):
+def generate_statistics_img(user: Member, stats: PlayerStatsModel):
     """"""
     width, height = 543, 745
     with Image.open(TEMPLATES_DIR + "/statistics.png") as img:
@@ -96,21 +82,20 @@ def generate_statistics_img(stats):
         draw = ImageDraw.Draw(img)
         fontbig = ImageFont.truetype(FONTS_DIR + "/ARIALUNI.TTF", 36)
 
-        name = stats.member.display_name[:20]
+        name = user.display_name[:20]
         name_box = draw.textbbox((0, 0), name, font=fontbig)
         name_width = name_box[2] - name_box[0]
 
         draw.text(((width - name_width) // 2, 32), name, font=fontbig)
-        draw.text((284, 97), str(stats.elo), font=fontbig, stroke_fill='white', stroke_width=1)
         draw.text((65, 226+109*0), str(stats.kills), font=font)
         draw.text((65, 226+109*1), str(stats.deaths), font=font)
         draw.text((65, 226+109*2), str(stats.assists), font=font)
         draw.text((65, 226+109*4), str(stats.headshots), font=font)
         draw.text((65, 226+109*3), str(stats.hsp), font=font)
         draw.text((372, 226+109*0), str(stats.kdr), font=font)
-        draw.text((372, 226+109*1), str(stats.played_matches), font=font)
+        draw.text((372, 226+109*1), str(stats.total_matches), font=font)
         draw.text((372, 226+109*2), str(stats.wins), font=font)
-        draw.text((372, 226+109*3), str(stats.win_percent), font=font)
+        # draw.text((372, 226+109*3), str(stats.win_percent), font=font)
 
         img.save(SAVE_IMG_DIR + '/statistics.png')
 

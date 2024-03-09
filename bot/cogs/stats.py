@@ -22,14 +22,14 @@ class StatsCog(commands.Cog, name='Stats'):
     async def view_stats(self, interaction: Interaction, target: Optional[Member]):
         await interaction.response.defer(ephemeral=True)
         user = target or interaction.user
-        player_model = await self.bot.db.get_player_by_discord_id(user.id, self.bot)
+        player_stats = await self.bot.db.get_player_stats(user.id)
 
-        if not player_model:
+        if not player_stats:
             raise CustomError(
                 f"No statistics were recorded.")
         
         try:
-            file = generate_statistics_img(player_model)
+            file = generate_statistics_img(user, player_stats)
             await interaction.followup.send(file=file)
         except Exception as e:
             self.bot.logger.error(e, exc_info=1)
@@ -38,11 +38,6 @@ class StatsCog(commands.Cog, name='Stats'):
     async def reset_stats(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
         user = interaction.user
-        player_model = await self.bot.db.get_player_by_discord_id(user.id, self.bot)
-
-        if not player_model:
-            raise CustomError(
-                f"You must be linked to use this command.")
         
         embed = Embed(description=f"Are you sure you want to reset your stats?")
         confirm = ConfirmView(interaction.user)
@@ -53,8 +48,8 @@ class StatsCog(commands.Cog, name='Stats'):
             raise CustomError("Reset stats rejected")
         
         try:
-            await self.bot.db.reset_user_stats(user.id)
-            embed.description = "Your stats reset successfully."
+            await self.bot.db.delete_player_stats(user.id)
+            embed.description = "Your stats have been reset successfully."
         except Exception as e:
             embed.description = "Something went wront, please try again later."
             self.bot.logger.error(e, exc_info=1)

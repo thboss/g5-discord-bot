@@ -8,8 +8,7 @@ import discord
 
 from bot.resources import Config
 from bot.helpers.api import MatchPlayer, Match
-from bot.helpers.models.playerstats import PlayerStatsModel
-from bot.helpers.models import LobbyModel, MatchModel, GuildModel, PlayerModel
+from bot.helpers.models import LobbyModel, MatchModel, GuildModel, PlayerModel, PlayerStatsModel
 
 
 class DBManager:
@@ -118,16 +117,39 @@ class DBManager:
         """"""
         sql = f"DELETE FROM matches WHERE id = $1;"
         await self.query(sql, match_id)
-
-    async def get_players_stats(self, match_id: str, team=None) -> List[PlayerStatsModel]:
+    
+    async def get_player_stats(self, user_id: int) -> Optional[PlayerStatsModel]:
         """"""
-        sql = "SELECT user_id FROM player_stats\n" \
-            f"    WHERE match_id = $1;"
-        if team:
-            sql = sql.replace(";", " AND team=$2")
+        sql = "SELECT\n" \
+              "    ps.steam_id, ps.user_id,\n" \
+              "    SUM(ps.kills) as kills,\n" \
+              "    SUM(ps.deaths) as deaths,\n" \
+              "    SUM(ps.assists) as assists,\n" \
+              "    SUM(ps.headshots) as headshots,\n" \
+              "    SUM(ps.mvps) as mvps,\n" \
+              "    SUM(ps.k2) as k2,\n" \
+              "    SUM(ps.k3) as k3,\n" \
+              "    SUM(ps.k4) as k4,\n" \
+              "    SUM(ps.k5) as k5,\n" \
+              "    COUNT(ps.match_id) AS total_matches,\n" \
+              "    (SELECT COUNT(*)\n" \
+              "    FROM matches m\n" \
+              "    JOIN player_stats ps2\n" \
+              "        ON m.id = ps2.match_id AND ps2.team = m.winner\n" \
+              "    WHERE m.canceled = false AND ps2.user_id = ps.user_id) AS wins\n" \
+              "FROM player_stats ps\n" \
+              "WHERE ps.user_id = $1 AND ps.match_id IN (\n" \
+              "    SELECT id FROM matches WHERE canceled = false\n" \
+              ")\n" \
+              "GROUP BY ps.steam_id, ps.user_id;"
 
-        query = await self.query(sql, match_id, team)
-        return [PlayerStatsModel.from_dict(data) for data in query]
+        query = await self.query(sql, user_id)
+        if query:
+            return PlayerStatsModel.from_dict(query[0])
+        
+    async def delete_player_stats(self, user_id: int):
+        sql = "DELETE FROM player_stats WHERE user_id = $1;"
+        await self.query(sql, user_id)
 
     async def get_player_by_discord_id(self, user_id: int) -> Optional[PlayerModel]:
         """"""
@@ -355,14 +377,6 @@ class DBManager:
         """"""
         sql = "SELECT id FROM matches WHERE game_server_id = $1 AND finished=false;"
         return await self.query(sql, game_server_id)
-    
-    async def get_player_stats(self, user_id: int, match_id: str=None):
-        """"""
-        sql = "SELECT * FROM player_stats WHERE user_id = $1;"
-        if match_id:
-            sql = sql.replace(";", " AND match_id = $2;")
-
-        return await self.query(sql, user_id, match_id)
     
     async def insert_players_stats(self, players_stats: List[dict]):
         """"""
