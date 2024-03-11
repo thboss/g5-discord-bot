@@ -23,7 +23,7 @@ class StatsCog(commands.Cog, name='Stats'):
     async def view_stats(self, interaction: Interaction, target: Optional[Member]):
         await interaction.response.defer(ephemeral=True)
         user = target or interaction.user
-        player_stats = await self.bot.db.get_players_stats([u.id for u in interaction.guild.members])
+        player_stats = await self.bot.db.get_players_stats([user.id])
 
         if not player_stats:
             raise CustomError(

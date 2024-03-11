@@ -2,7 +2,7 @@
 
 import asyncpg
 import logging
-from typing import List, Literal, Union, Optional
+from typing import List, Union, Optional
 
 import discord
 
@@ -160,9 +160,9 @@ class DBManager:
                 players_stats.append(PlayerStatsModel(uid))
 
         # Sort players based on their original index positions
-        sorted_players = sorted(players_stats, key=lambda player: index_map[player.user_id])
+        players_stats.sort(key=lambda player: index_map[player.user_id])
 
-        return sorted_players
+        return players_stats
         
     async def delete_player_stats(self, user_id: int):
         sql = "DELETE FROM player_stats WHERE user_id = $1;"
@@ -200,6 +200,18 @@ class DBManager:
                 if user.id == data['id']:
                     return_obj.append(PlayerModel.from_dict(data, user))
         return return_obj
+    
+    async def get_players_by_steam_ids(self, steam_ids: List[int]) -> List[PlayerModel]:
+        """"""
+        sql = "SELECT * FROM users\n" \
+            "    WHERE steam_id = ANY($1::BIGINT[]);"
+        users_data = await self.query(sql, steam_ids)
+        players = []
+        for data in users_data:
+            user = self.bot.get_user(data['id'])
+            if user:
+                players.append(PlayerModel.from_dict(data, user))
+        return players
 
     async def insert_player(self, user_id: int, steam_id: int) -> None:
         """"""

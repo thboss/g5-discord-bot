@@ -81,14 +81,14 @@ class PlayerStatsModel:
 
         weights = {
             'kdr': 1.0,
-            'assist_rate': 1.0,
+            'assist_rate': 0.7,
             'hs_rate': 0.2,
             'mvp_rate': 0.4,
-            'k2_rate': 0.5,
-            'k3_rate': 1.0,
-            'k4_rate': 2.0,
-            'k5_rate': 3.0,
-            'win_rate': 0.6
+            'k2_rate': 0.6,
+            'k3_rate': 3.0,
+            'k4_rate': 5.0,
+            'k5_rate': 10.0,
+            'win_rate': 1.5
         }
 
         # Calculate weighted sum of relevant stats

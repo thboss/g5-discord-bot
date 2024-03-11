@@ -8,7 +8,6 @@ from random import choice, shuffle
 import asyncio
 
 from bot.helpers.api import Match
-from bot.helpers.models.playerstats import PlayerStatsModel
 from bot.helpers.utils import generate_api_key, generate_scoreboard_img, set_scoreboard_image
 from bot.helpers.models import GuildModel, MatchModel
 from bot.bot import G5Bot
@@ -219,6 +218,7 @@ class MatchCog(commands.Cog, name="Match"):
                 'game_server_id': game_server.id,
                 'guild': guild.id,
                 'channel': channel.id,
+                'message': message.id,
                 'category': category.id,
                 'team1_channel': team1_channel.id,
                 'team2_channel': team2_channel.id,
@@ -247,27 +247,23 @@ class MatchCog(commands.Cog, name="Match"):
             self.bot.logger.error(e, exc_info=1)
             description = 'Something went wrong! See logs for details'
         else:
-            try:
-                await message.delete()
-            except:
-                pass
-
             embed = self.embed_match_info(api_match, game_server)
-            try:
-                team1_stats = {
-                    player_model: next(player_stat for player_stat in api_match.players if player_model.steam_id == player_stat.steam_id)
-                    for player_model in team1_players_model
-                }
-                team2_stats = {
-                    player_model: next(player_stat for player_stat in api_match.players if player_model.steam_id == player_stat.steam_id)
-                    for player_model in team2_players_model
-                }
-                file = generate_scoreboard_img(api_match, team1_stats, team2_stats)
-                embed = set_scoreboard_image(embed)
-                match_msg = await channel.send(file=file, embed=embed)
-                await self.bot.db.update_match(api_match.id, message=match_msg.id)
-            except Exception as e:
-                self.bot.logger.error(e, exc_info=1)
+            await message.edit(embed=embed)
+            # try:
+            #     team1_stats = {
+            #         player_model: next(player_stat for player_stat in api_match.players if player_model.steam_id == player_stat.steam_id)
+            #         for player_model in team1_players_model
+            #     }
+            #     team2_stats = {
+            #         player_model: next(player_stat for player_stat in api_match.players if player_model.steam_id == player_stat.steam_id)
+            #         for player_model in team2_players_model
+            #     }
+            #     file = generate_scoreboard_img(api_match, team1_stats, team2_stats)
+            #     embed = set_scoreboard_image(embed)
+            #     match_msg = await channel.send(file=file, embed=embed)
+            #     await self.bot.db.update_match(api_match.id, message=match_msg.id)
+            # except Exception as e:
+            #     self.bot.logger.error(e, exc_info=1)
 
             return True
 
@@ -356,6 +352,23 @@ class MatchCog(commands.Cog, name="Match"):
         dict_stats.pop('players')
         
         await self.bot.db.update_match(match_api.id, **dict_stats)
+
+        if not match_api.canceled:
+            team1_steam_ids = [ps.steam_id for ps in match_api.players if ps.team == 'team1']
+            team2_steam_ids = [ps.steam_id for ps in match_api.players if ps.team == 'team2']
+            team1_players_model = await self.bot.db.get_players_by_steam_ids(team1_steam_ids)
+            team2_players_model = await self.bot.db.get_players_by_steam_ids(team2_steam_ids)
+
+            team1_stats = {
+                player_model: next(player_stat for player_stat in match_api.players if player_model.steam_id == player_stat.steam_id)
+                for player_model in team1_players_model
+            }
+            team2_stats = {
+                player_model: next(player_stat for player_stat in match_api.players if player_model.steam_id == player_stat.steam_id)
+                for player_model in team2_players_model
+            }
+            file = generate_scoreboard_img(match_api, team1_stats, team2_stats)
+            await guild_model.results_channel.send(file=file)
 
 
 async def setup(bot):
