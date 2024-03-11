@@ -23,14 +23,14 @@ class StatsCog(commands.Cog, name='Stats'):
     async def view_stats(self, interaction: Interaction, target: Optional[Member]):
         await interaction.response.defer(ephemeral=True)
         user = target or interaction.user
-        player_stats = await self.bot.db.get_player_stats(user.id)
+        player_stats = await self.bot.db.get_players_stats([u.id for u in interaction.guild.members])
 
         if not player_stats:
             raise CustomError(
                 f"No statistics were recorded.")
         
         try:
-            file = generate_statistics_img(user, player_stats)
+            file = generate_statistics_img(user, player_stats[0])
             embed = Embed()
             embed = set_statistics_image(embed)
             await interaction.followup.send(file=file, embed=embed)

@@ -68,27 +68,28 @@ class MatchCog(commands.Cog, name="Match"):
     
     async def autobalance_teams(self, users: List[Member]):
         """"""
-        players_stats = await self.bot.db.get_players(users)
-        players_stats.sort(key=lambda x: x.elo)
+        users_ids = [u.id for u in users]
+        players = await self.bot.db.get_players_stats(users_ids)
+        stats_dict = dict(zip(players, users))
+        players_stats = list(stats_dict.keys())
+        players_stats.sort(key=lambda x: x.rating)
 
         # Balance teams
         team_size = len(players_stats) // 2
-        team1_stats = [players_stats.pop()]
-        team2_stats = [players_stats.pop()]
+        team_one = [players_stats.pop()]
+        team_two = [players_stats.pop()]
 
         while players_stats:
-            if len(team1_stats) >= team_size:
-                team2_stats.append(players_stats.pop())
-            elif len(team2_stats) >= team_size:
-                team1_stats.append(players_stats.pop())
-            elif sum(p.elo for p in team1_stats) < sum(p.elo for p in team2_stats):
-                team1_stats.append(players_stats.pop())
+            if len(team_one) >= team_size:
+                team_two.append(players_stats.pop())
+            elif len(team_two) >= team_size:
+                team_one.append(players_stats.pop())
+            elif sum(p.rating for p in team_one) < sum(p.rating for p in team_two):
+                team_one.append(players_stats.pop())
             else:
-                team2_stats.append(players_stats.pop())
+                team_two.append(players_stats.pop())
 
-        team1_users = [player_model.discord for player_model in team1_stats]
-        team2_users = [player_model.discord for player_model in team2_stats]
-        return team1_users, team2_users
+        return list(map(stats_dict.get, team_one)), list(map(stats_dict.get, team_two))
 
     def randomize_teams(self, users: List[Member]):
         """"""

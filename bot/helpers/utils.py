@@ -90,12 +90,12 @@ def generate_statistics_img(user: Member, stats: PlayerStatsModel):
         draw.text((65, 226+109*0), str(stats.kills), font=font)
         draw.text((65, 226+109*1), str(stats.deaths), font=font)
         draw.text((65, 226+109*2), str(stats.assists), font=font)
-        draw.text((65, 226+109*4), str(stats.headshots), font=font)
-        draw.text((65, 226+109*3), str(stats.hsp), font=font)
+        draw.text((65, 226+109*3), str(stats.headshots), font=font)
+        draw.text((65, 226+109*4), str(stats.hsp), font=font)
         draw.text((372, 226+109*0), str(stats.kdr), font=font)
         draw.text((372, 226+109*1), str(stats.total_matches), font=font)
         draw.text((372, 226+109*2), str(stats.wins), font=font)
-        # draw.text((372, 226+109*3), str(stats.win_percent), font=font)
+        draw.text((372, 226+109*3), str(stats.rating), font=font)
 
         img.save(SAVE_IMG_DIR + '/statistics.png')
 

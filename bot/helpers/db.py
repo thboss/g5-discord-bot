@@ -116,34 +116,42 @@ class DBManager:
         sql = f"DELETE FROM matches WHERE id = $1;"
         await self.query(sql, match_id)
     
-    async def get_player_stats(self, user_id: int) -> Optional[PlayerStatsModel]:
+    async def get_players_stats(self, users_ids: List[int]) -> List[PlayerStatsModel]:
         """"""
-        sql = "SELECT\n" \
-              "    ps.steam_id, ps.user_id,\n" \
-              "    SUM(ps.kills) as kills,\n" \
-              "    SUM(ps.deaths) as deaths,\n" \
-              "    SUM(ps.assists) as assists,\n" \
-              "    SUM(ps.headshots) as headshots,\n" \
-              "    SUM(ps.mvps) as mvps,\n" \
-              "    SUM(ps.k2) as k2,\n" \
-              "    SUM(ps.k3) as k3,\n" \
-              "    SUM(ps.k4) as k4,\n" \
-              "    SUM(ps.k5) as k5,\n" \
-              "    COUNT(ps.match_id) AS total_matches,\n" \
-              "    (SELECT COUNT(*)\n" \
-              "    FROM matches m\n" \
-              "    JOIN player_stats ps2\n" \
-              "        ON m.id = ps2.match_id AND ps2.team = m.winner\n" \
-              "    WHERE m.canceled = false AND ps2.user_id = ps.user_id) AS wins\n" \
-              "FROM player_stats ps\n" \
-              "WHERE ps.user_id = $1 AND ps.match_id IN (\n" \
-              "    SELECT id FROM matches WHERE canceled = false\n" \
-              ")\n" \
-              "GROUP BY ps.steam_id, ps.user_id;"
-
-        query = await self.query(sql, user_id)
-        if query:
-            return PlayerStatsModel.from_dict(query[0])
+        sql = """
+        WITH MatchStats AS (
+            SELECT
+                ps2.user_id,
+                COUNT(*) FILTER (WHERE ps2.team = m.winner) AS wins,
+                SUM(m.rounds_played) AS rounds_played
+            FROM matches m
+            JOIN player_stats ps2 ON m.id = ps2.match_id
+            WHERE m.canceled = false
+            GROUP BY ps2.user_id
+        )
+        SELECT
+            ps.steam_id, ps.user_id,
+            SUM(ps.kills) as kills,
+            SUM(ps.deaths) as deaths,
+            SUM(ps.assists) as assists,
+            SUM(ps.headshots) as headshots,
+            SUM(ps.mvps) as mvps,
+            SUM(ps.k2) as k2,
+            SUM(ps.k3) as k3,
+            SUM(ps.k4) as k4,
+            SUM(ps.k5) as k5,
+            COUNT(ps.match_id) AS total_matches,
+            ms.wins,
+            ms.rounds_played
+        FROM player_stats ps
+        JOIN MatchStats ms ON ps.user_id = ms.user_id
+        WHERE ps.user_id = ANY($1::BIGINT[]) AND ps.match_id IN (
+            SELECT id FROM matches WHERE canceled = false
+        )
+        GROUP BY ps.steam_id, ps.user_id, ms.wins, ms.rounds_played;
+        """
+        query = await self.query(sql, users_ids)
+        return [PlayerStatsModel.from_dict(data) for data in query]
         
     async def delete_player_stats(self, user_id: int):
         sql = "DELETE FROM player_stats WHERE user_id = $1;"
