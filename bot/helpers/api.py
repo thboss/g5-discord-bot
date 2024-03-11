@@ -108,6 +108,7 @@ class GameServer:
         self.on = data['on']
         self.game_mode = data['cs2_settings']['game_mode']
         self.match_id = data['match_id']
+        self.booting = data['booting']
 
     @classmethod
     def from_dict(cls, data: dict) -> "GameServer":
@@ -186,13 +187,11 @@ class APIManager:
     async def update_game_server(
         self,
         server_id: str,
-        slots: int,
         game_mode: Literal["competitive", "wingman"]=None,
         location: str=None,
     ):
         """"""
         url = f"/api/0.1/game-servers/{server_id}"
-        # payload = {"cs2_settings.slots": 14 if slots > 14 else slots}
         payload = {}
         if game_mode: payload["cs2_settings.game_mode"] = game_mode
         if location: payload["location"] = location

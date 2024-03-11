@@ -178,7 +178,7 @@ class MatchCog(commands.Cog, name="Match"):
             await message.edit(embed=Embed(description='Searching for available game servers...'), view=None)
             await asyncio.sleep(2)
 
-            game_server = await self.find_game_server()
+            game_server = await self.prepare_game_server(location, game_mode)
 
             await message.edit(embed=Embed(description='Setting up match on game server...'), view=None)
             await asyncio.sleep(2)
@@ -188,11 +188,6 @@ class MatchCog(commands.Cog, name="Match"):
                 if spec.discord not in team1_users and spec.discord not in team2_users:
                     match_players.append({'steam_id_64': spec.steam_id, 'team': 'spectator'})
 
-            await self.bot.api.update_game_server(
-                game_server.id,
-                len(match_players),
-                game_mode=game_mode,
-                location=location)
 
             api_key = generate_api_key()
             api_match = await self.bot.api.create_match(
@@ -274,12 +269,19 @@ class MatchCog(commands.Cog, name="Match"):
         except:
             pass
 
-    async def find_game_server(self):
+    async def prepare_game_server(self, location, game_mode):
         """"""
         game_servers = await self.bot.api.get_game_servers()
 
-        for game_server in game_servers:            
+        for game_server in game_servers:
+            if game_server.booting:
+                continue
             if not game_server.match_id:
+                await self.bot.api.update_game_server(
+                    game_server.id,
+                    game_mode=game_mode,
+                    location=location)
+                game_server = await self.bot.api.get_game_server(game_server.id)
                 return game_server
 
         raise ValueError("No game server available at the moment.")
