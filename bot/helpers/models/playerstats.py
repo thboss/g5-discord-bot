@@ -7,19 +7,19 @@ class PlayerStatsModel:
     def __init__(
         self,
         user_id: int,
-        steam_id: int,
-        kills: int,
-        deaths: int,
-        assists: int,
-        mvps: int,
-        headshots: int,
-        k2: int,
-        k3: int,
-        k4: int,
-        k5: int,
-        rounds_played: int,
-        wins: int,
-        total_matches: int
+        steam_id: int=None,
+        kills: int=0,
+        deaths: int=0,
+        assists: int=0,
+        mvps: int=0,
+        headshots: int=0,
+        k2: int=0,
+        k3: int=0,
+        k4: int=0,
+        k5: int=0,
+        rounds_played: int=0,
+        wins: int=0,
+        total_matches: int=0
     ):
         """"""
         self.user_id = user_id

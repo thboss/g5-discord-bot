@@ -8,6 +8,7 @@ from random import choice, shuffle
 import asyncio
 
 from bot.helpers.api import Match
+from bot.helpers.models.playerstats import PlayerStatsModel
 from bot.helpers.utils import generate_api_key, generate_scoreboard_img, set_scoreboard_image
 from bot.helpers.models import GuildModel, MatchModel
 from bot.bot import G5Bot
@@ -68,26 +69,27 @@ class MatchCog(commands.Cog, name="Match"):
     
     async def autobalance_teams(self, users: List[Member]):
         """"""
-        users_ids = [u.id for u in users]
-        players = await self.bot.db.get_players_stats(users_ids)
-        stats_dict = dict(zip(players, users))
-        players_stats = list(stats_dict.keys())
-        players_stats.sort(key=lambda x: x.rating)
+        players_stats = await self.bot.db.get_players_stats([u.id for u in users])
 
-        # Balance teams
+        # Create a dictionary mapping PlayerStatsModel objects to discord.Member objects
+        stats_dict = {ps: users[idx] for idx, ps in enumerate(players_stats)}
+        
+        # Sort players by their rating
+        players_stats.sort(key=lambda x: x.rating, reverse=True)
+
+        # Balance teams based on player ratings
         team_size = len(players_stats) // 2
-        team_one = [players_stats.pop()]
-        team_two = [players_stats.pop()]
+        team_one, team_two = [], []
 
-        while players_stats:
-            if len(team_one) >= team_size:
-                team_two.append(players_stats.pop())
-            elif len(team_two) >= team_size:
-                team_one.append(players_stats.pop())
-            elif sum(p.rating for p in team_one) < sum(p.rating for p in team_two):
-                team_one.append(players_stats.pop())
+        # Distribute players to teams ensuring balanced total ratings
+        for player in players_stats:
+            team_one_rating = sum(p.rating for p in team_one)
+            team_two_rating = sum(p.rating for p in team_two)
+            
+            if len(team_one) < team_size and (len(team_two) == team_size or team_one_rating <= team_two_rating):
+                team_one.append(player)
             else:
-                team_two.append(players_stats.pop())
+                team_two.append(player)
 
         return list(map(stats_dict.get, team_one)), list(map(stats_dict.get, team_two))
 

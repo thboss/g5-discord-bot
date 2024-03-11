@@ -151,7 +151,18 @@ class DBManager:
         GROUP BY ps.steam_id, ps.user_id, ms.wins, ms.rounds_played;
         """
         query = await self.query(sql, users_ids)
-        return [PlayerStatsModel.from_dict(data) for data in query]
+        players_stats = [PlayerStatsModel.from_dict(data) for data in query]
+        index_map = {user_id: index for index, user_id in enumerate(users_ids)}
+
+        # Add any missing players as PlayerStatsModel with default stats
+        for uid in users_ids:
+            if uid not in [player.user_id for player in players_stats]:
+                players_stats.append(PlayerStatsModel(uid))
+
+        # Sort players based on their original index positions
+        sorted_players = sorted(players_stats, key=lambda player: index_map[player.user_id])
+
+        return sorted_players
         
     async def delete_player_stats(self, user_id: int):
         sql = "DELETE FROM player_stats WHERE user_id = $1;"
