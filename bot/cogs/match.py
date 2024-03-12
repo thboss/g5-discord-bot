@@ -200,6 +200,16 @@ class MatchCog(commands.Cog, name="Match"):
                 api_key
             )
 
+            attempts = 0
+            game_server = await self.bot.api.get_game_server(game_server.id)
+            while not game_server.ip and attempts < 5:
+                game_server = await self.bot.api.get_game_server(game_server.id)
+                await asyncio.sleep(3)
+                attempts += 1
+            
+            if not game_server.ip:
+                raise(APIError("Something went wrong on game server."))
+
             await message.edit(embed=Embed(description='Setting up teams channels...'), view=None)
             category, team1_channel, team2_channel = await self.create_match_channels(
                 api_match.id,
@@ -244,21 +254,6 @@ class MatchCog(commands.Cog, name="Match"):
         else:
             embed = self.embed_match_info(api_match, game_server)
             await message.edit(embed=embed)
-            # try:
-            #     team1_stats = {
-            #         player_model: next(player_stat for player_stat in api_match.players if player_model.steam_id == player_stat.steam_id)
-            #         for player_model in team1_players_model
-            #     }
-            #     team2_stats = {
-            #         player_model: next(player_stat for player_stat in api_match.players if player_model.steam_id == player_stat.steam_id)
-            #         for player_model in team2_players_model
-            #     }
-            #     file = generate_scoreboard_img(api_match, team1_stats, team2_stats)
-            #     embed = set_scoreboard_image(embed)
-            #     match_msg = await channel.send(file=file, embed=embed)
-            #     await self.bot.db.update_match(api_match.id, message=match_msg.id)
-            # except Exception as e:
-            #     self.bot.logger.error(e, exc_info=1)
 
             return True
 
@@ -281,7 +276,6 @@ class MatchCog(commands.Cog, name="Match"):
                     game_server.id,
                     game_mode=game_mode,
                     location=location)
-                game_server = await self.bot.api.get_game_server(game_server.id)
                 return game_server
 
         raise ValueError("No game server available at the moment.")
