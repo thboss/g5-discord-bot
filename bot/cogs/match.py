@@ -58,7 +58,7 @@ class MatchCog(commands.Cog, name="Match"):
 
     async def pick_teams(self, message: Message, users: List[Member], captain_method: str):
         """"""
-        teams_view = PickTeamsView(message, users)
+        teams_view = PickTeamsView(self.bot, message, users)
         await teams_view.start(captain_method)
         await message.edit(embed=teams_view.embed_teams_pick("Start teams pickings"), view=teams_view)
         await teams_view.wait()

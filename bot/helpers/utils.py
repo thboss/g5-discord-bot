@@ -30,7 +30,7 @@ GAME_SERVER_LOCATIONS = {
     "dusseldorf": "Germany",
     "amsterdam": "Netherlands",
     "warsaw": "Poland",
-    "moscow": "Russia",
+    # "moscow": "Russia",
     "barcelona": "Spain",
     "stockholm": "Sweden",
     "istanbul": "Turkey",
