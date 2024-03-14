@@ -85,7 +85,9 @@ class G5Bot(commands.AutoShardedBot):
                         f"Failed to load extension {extension}\n{exception}")
 
     async def check_guild_requirements(self, guild: Guild) -> None:
-        """"""
+        """
+        Check and set up the required channels, roles, and category for the guild.
+        """
         guild_model = await self.db.get_guild_by_id(guild.id)
         category = guild_model.category
         linked_role = guild_model.linked_role

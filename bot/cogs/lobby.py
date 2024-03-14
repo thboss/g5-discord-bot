@@ -6,7 +6,7 @@ from collections import defaultdict
 import asyncio
 
 from discord.ext import commands
-from discord import app_commands, Interaction, Embed, Member, VoiceState, HTTPException
+from discord import PermissionOverwrite, app_commands, Interaction, Embed, Member, VoiceState, HTTPException
 
 from bot.bot import G5Bot
 from bot.helpers.models import LobbyModel
@@ -106,15 +106,18 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
         guild = interaction.guild
         guild_model = await self.bot.db.get_guild_by_id(guild.id)
+
+        perms = {
+            guild.self_role: PermissionOverwrite(connect=True, send_messages=True),
+            guild.default_role: PermissionOverwrite(connect=False, send_messages=False),
+            guild_model.linked_role: PermissionOverwrite(connect=True)
+        }
         voice_channel = await guild.create_voice_channel(
             category=guild_model.category,
             name='Lobby',
-            user_limit=capacity.value)
-
-        await voice_channel.set_permissions(guild.self_role, connect=True)
-        await voice_channel.set_permissions(guild.default_role, connect=False)
-        await voice_channel.set_permissions(guild_model.linked_role, connect=True)
-        await voice_channel.set_permissions(guild.default_role, send_messages=False)
+            user_limit=capacity.value,
+            overwrites=perms
+        )
 
         lobby_data = {
             'guild': guild.id,
