@@ -8,7 +8,7 @@ from random import choice, shuffle
 import asyncio
 
 from bot.helpers.api import Match
-from bot.helpers.utils import generate_api_key, generate_scoreboard_img, set_scoreboard_image
+from bot.helpers.utils import generate_api_key, generate_scoreboard_img
 from bot.helpers.models import GuildModel, MatchModel
 from bot.bot import G5Bot
 from bot.helpers.errors import APIError, CustomError
@@ -187,7 +187,6 @@ class MatchCog(commands.Cog, name="Match"):
             for spec in spectators:
                 if spec.discord not in team1_users and spec.discord not in team2_users:
                     match_players.append({'steam_id_64': spec.steam_id, 'team': 'spectator'})
-
 
             api_key = generate_api_key()
             api_match = await self.bot.api.create_match(
