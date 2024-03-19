@@ -2,7 +2,7 @@
 
 from discord.ext import commands
 from discord import Embed, Member, Message, Guild, PermissionOverwrite, VoiceChannel, app_commands, Interaction
-from typing import List
+from typing import List, Literal
 
 from random import choice, shuffle
 import asyncio
@@ -56,6 +56,49 @@ class MatchCog(commands.Cog, name="Match"):
         except:
             pass
 
+    @app_commands.command(name="add-player", description="Add a player to a specific live match.")
+    @app_commands.describe(user="A user to join the match")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def add_match_player(self, interaction: Interaction, user: Member, match_id: str, team: Literal["team1", "team2", "spectator"]):
+        """"""
+        await interaction.response.defer()
+
+        match_model = await self.bot.db.get_match_by_id(match_id)
+        if not match_model:
+            raise CustomError("Invalid match ID.")
+        
+        if match_model.finished:
+            raise CustomError("Match is already finished.")
+        
+        player_model = await self.bot.db.get_player_by_discord_id(user.id)
+        if not player_model:
+            raise CustomError(f"User {user.mention} is not linked.")
+        
+        await self.bot.api.add_match_player(match_id, player_model.steam_id, team)
+
+        players_stats = [{
+            'match_id': match_id,
+            'steam_id': player_model.steam_id,
+            'user_id': user.id,
+            'team': team
+        }]
+        await self.bot.db.insert_players_stats(players_stats)
+
+        team_channel = None
+        if team == "team1":
+            team_channel = match_model.team1_channel
+        elif team == "team2":
+            team_channel = match_model.team2_channel
+        
+        if team_channel:
+            try:
+                await team_channel.set_permissions(user, connect=True)
+                await user.move_to(team_channel)
+            except: pass
+
+        embed = Embed(description=f"User {user.mention} added into match #{match_id}.")
+        await interaction.followup.send(embed=embed)
+        
     async def pick_teams(self, message: Message, users: List[Member], captain_method: str):
         """"""
         teams_view = PickTeamsView(self.bot, message, users)

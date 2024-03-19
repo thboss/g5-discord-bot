@@ -7,7 +7,6 @@ from typing import List, Union, Optional
 import discord
 
 from bot.resources import Config
-from bot.helpers.api import MatchPlayer, Match
 from bot.helpers.models import LobbyModel, MatchModel, GuildModel, PlayerModel, PlayerStatsModel
 
 
@@ -224,11 +223,6 @@ class DBManager:
         sql = 'UPDATE users SET steam_id = $1 WHERE id = $2;'
         await self.query(sql, steam_id, user_id)
 
-    async def delete_player(self, user_id: int) -> None:
-        """"""
-        sql = "DELETE FROM users WHERE id = $1"
-        await self.query(sql, user_id)
-
     async def get_lobby_by_id(self, lobby_id: int) -> Union["LobbyModel", None]:
         """"""
         sql = "SELECT * FROM lobbies WHERE id = $1;"
@@ -238,38 +232,13 @@ class DBManager:
             if guild:
                 return LobbyModel.from_dict(data[0], guild)
 
-    async def get_lobby_by_voice_channel(self, channel: discord.VoiceChannel) -> Union["LobbyModel", None]:
+    async def get_lobby_by_channel(self, channel: discord.VoiceChannel) -> Union["LobbyModel", None]:
         """"""
         sql = "SELECT * FROM lobbies\n" \
             f"    WHERE lobby_channel = $1;"
         data = await self.query(sql, channel.id)
         if data:
             return LobbyModel.from_dict(data[0], channel.guild)
-
-    async def get_lobby_by_text_channel(self, channel: discord.TextChannel) -> Union["LobbyModel", None]:
-        """"""
-        sql = "SELECT * FROM lobbies\n" \
-            f"    WHERE queue_channel = $1;"
-        data = await self.query(sql, channel.id)
-        if data:
-            return LobbyModel.from_dict(data[0], channel.guild)
-
-    async def get_guild_lobbies(self, guild: discord.Guild) -> List["LobbyModel"]:
-        """"""
-        sql = "SELECT * FROM lobbies\n" \
-            f"    WHERE guild = $1;"
-        lobbies = await self.query(sql, guild.id)
-        return [LobbyModel.from_dict(data, guild) for data in lobbies]
-
-    async def get_user_lobby(self, user_id: int, guild: discord.Guild) -> Union["LobbyModel", None]:
-        """"""
-        sql = "SELECT l.* FROM lobby_users qu\n" \
-            "JOIN lobbies l\n" \
-            "    ON qu.lobby_id = l.id AND l.guild = $1\n" \
-            "WHERE qu.user_id = $2;"
-        data = await self.query(sql, guild.id, user_id)
-        if data:
-            return LobbyModel.from_dict(data[0], guild)
 
     async def insert_lobby(self, data: dict) -> int:
         """"""
@@ -328,39 +297,6 @@ class DBManager:
         sql = f"DELETE FROM lobby_users WHERE lobby_id = $1;"
         await self.query(sql, lobby_id)
 
-    async def get_lobby_maps(self, lobby_id: int) -> List[str]:
-        """"""
-        sql = "SELECT map_name FROM lobby_maps WHERE lobby_id = $1;"
-        result = await self.query(sql, lobby_id)
-        return [m['map_name'] for m in result]
-
-    async def clear_lobby_maps(self, lobby_id: int) -> None:
-        """"""
-        sql = "DELETE FROM lobby_maps WHERE lobby_id = $1;"
-        await self.query(sql, lobby_id)
-
-    async def insert_lobby_maps(self, lobby_id: int, maps: List[str]) -> None:
-        """"""
-        values = f", ".join(f"({lobby_id}, '{m}')" for m in maps)
-        sql = f"INSERT INTO lobby_maps (lobby_id, map_name) VALUES {values};"
-        await self.query(sql)
-
-    async def delete_lobby_maps(self, lobby_id: int, maps: List[str]) -> None:
-        """"""
-        sql = "DELETE FROM lobby_maps WHERE lobby_id = $1 AND map_name = ANY($2);"
-        await self.query(sql, lobby_id, maps)
-
-    async def update_lobby_maps(self, lobby_id: int, new_maps: List[str], existing_maps: List[str]) -> None:
-        """"""
-        delete_maps = list(set(existing_maps) - set(new_maps))
-        insert_maps = list(set(new_maps) - set(existing_maps))
-
-        if delete_maps:
-            await self.delete_lobby_maps(lobby_id, delete_maps)
-
-        if insert_maps:
-            await self.insert_lobby_maps(lobby_id, insert_maps)
-
     async def get_guild_by_id(self, guild_id: int) -> Union["GuildModel", None]:
         """"""
         sql = "SELECT * FROM guilds\n" \
@@ -402,11 +338,6 @@ class DBManager:
               "RETURNING user_id;"
         return await self.query(sql, guild.id)
     
-    async def is_server_in_use(self, game_server_id: str):
-        """"""
-        sql = "SELECT id FROM matches WHERE game_server_id = $1 AND finished=false;"
-        return await self.query(sql, game_server_id)
-    
     async def insert_players_stats(self, players_stats: List[dict]):
         """"""
         values =",\n".join(f"('{ps['match_id']}', {ps['steam_id']}, {ps['user_id']}, '{ps['team']}')"
@@ -414,19 +345,14 @@ class DBManager:
         sql = f"INSERT INTO player_stats (match_id, steam_id, user_id, team) VALUES {values};"
         await self.query(sql)
     
-    async def update_player_stats(self, user_id: int, stats: MatchPlayer):
+    async def update_player_stats(self, user_id: int, match_id: str, stats: dict):
         """"""
-        dict_stats = stats.to_dict
-        dict_stats.pop('match_id')
-        dict_stats.pop('steam_id')
-        dict_stats.pop('team')
-        dict_stats = {key: f"'{value}'" if isinstance(value, str) else value for key, value in dict_stats.items()}
         col_vals = ",\n    ".join(
-            f"{key} = {val}" for key, val in dict_stats.items()
+            f"{key} = {val}" for key, val in stats.items()
         )
 
         sql = f'UPDATE player_stats SET {col_vals} WHERE user_id = $1 AND match_id = $2;'
-        await self.query(sql, user_id, stats.match_id)
+        await self.query(sql, user_id, match_id)
 
     async def delete_player_stats(self, user_id: int):
         """"""

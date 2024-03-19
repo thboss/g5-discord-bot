@@ -59,7 +59,7 @@ class WebServer:
             try:
                 player_model = await self.bot.db.get_player_by_steam_id(player_stat.steam_id)
                 if player_model:
-                    await self.bot.db.update_player_stats(player_model.discord.id, player_stat)
+                    await self.bot.db.update_player_stats(player_model.discord.id, match_api.id, player_stat.to_dict)
             except Exception as e:
                 self.logger.error(e, exc_info=1)
 

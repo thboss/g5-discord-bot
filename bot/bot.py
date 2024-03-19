@@ -15,7 +15,7 @@ from .helpers.errors import on_app_command_error
 
 
 class G5Bot(commands.AutoShardedBot):
-    """"""
+    """ A Discord bot class with sharding capabilities. """
 
     def __init__(self, intents: dict) -> None:
         super().__init__(command_prefix=commands.when_mentioned_or('!'), help_command=None, intents=intents)
@@ -70,7 +70,7 @@ class G5Bot(commands.AutoShardedBot):
         """ Load extensions in the cogs folder. """
         _CWD = os.path.dirname(os.path.abspath(__file__))
         cogs = os.listdir(_CWD + "/cogs")
-        # Move logger cog to the first element in the list to be loaded first.
+        # Ensure the logger cog is loaded first.
         cogs.insert(0, cogs.pop(cogs.index('logger.py')))
         for file in cogs:
             if file.endswith(".py"):

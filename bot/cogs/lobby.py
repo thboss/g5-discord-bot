@@ -13,7 +13,6 @@ from bot.helpers.models import LobbyModel
 from bot.helpers.errors import CustomError, JoinLobbyError
 from bot.helpers.utils import GAME_SERVER_LOCATIONS
 from bot.views import ReadyView
-from bot.resources import Config
 
 
 CAPACITY_CHOICES = [
@@ -254,7 +253,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
             return
 
         if before.channel is not None:
-            lobby_model = await self.bot.db.get_lobby_by_voice_channel(before.channel)
+            lobby_model = await self.bot.db.get_lobby_by_channel(before.channel)
             if lobby_model:
                 if not self.in_progress[lobby_model.id]:
                     async with self.locks[lobby_model.id]:
@@ -265,7 +264,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
                                 "Uncaght exception when handling 'cogs.lobby._leave()' method:", e)
 
         if after.channel is not None:
-            lobby_model = await self.bot.db.get_lobby_by_voice_channel(after.channel)
+            lobby_model = await self.bot.db.get_lobby_by_channel(after.channel)
             if lobby_model:
                 if not self.in_progress[lobby_model.id]:
                     async with self.locks[lobby_model.id]:

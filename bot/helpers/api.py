@@ -32,9 +32,6 @@ class MatchPlayer:
     @property
     def to_dict(self) -> dict:
         return {
-            'match_id': self.match_id,
-            'steam_id': self.steam_id,
-            'team': self.team,
             'kills': self.kills,
             'deaths': self.deaths,
             'assists': self.assists,
@@ -170,7 +167,7 @@ class APIManager:
 
         async with self.session.get(url=url) as resp:
             if resp.status == 401:
-                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+                raise APIError("Invalid Dathost credentials!")
             resp_data = await resp.json()
             return GameServer.from_dict(resp_data)
         
@@ -180,7 +177,7 @@ class APIManager:
 
         async with self.session.get(url=url) as resp:
             if resp.status == 401:
-                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+                raise APIError("Invalid Dathost credentials!")
             resp_data = await resp.json()
             return [GameServer.from_dict(game_server) for game_server in resp_data if game_server['game'] == 'cs2']
         
@@ -198,7 +195,7 @@ class APIManager:
 
         async with self.session.put(url=url, data=payload) as resp:
             if resp.status == 401:
-                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+                raise APIError("Invalid Dathost credentials!")
             return resp.ok
         
     async def stop_game_server(self, server_id: str):
@@ -207,7 +204,7 @@ class APIManager:
 
         async with self.session.post(url=url) as resp:
             if resp.status == 401:
-                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+                raise APIError("Invalid Dathost credentials!")
             return resp.ok
 
     async def get_match(self, match_id: str) -> Optional["Match"]:
@@ -216,7 +213,7 @@ class APIManager:
 
         async with self.session.get(url=url) as resp:
             if resp.status == 401:
-                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
+                raise APIError("Invalid Dathost credentials!")
             resp_data = await resp.json()
             return Match.from_dict(resp_data)
         
@@ -252,34 +249,49 @@ class APIManager:
         }
 
         async with self.session.post(url=url, json=payload) as resp:
-            if resp.status == 401:
-                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
-            resp_data = await resp.json()
-            return Match.from_dict(resp_data)
+            if resp.ok:
+                resp_data = await resp.json()
+                return Match.from_dict(resp_data)
+            elif resp.status == 401:
+                raise APIError("Invalid Dathost credentials!")
+            else:
+                return APIError
 
     async def add_match_player(
         self,
         match_id: int,
-        steam_id: str,
+        steam_id: int,
         team: Literal["team1", "team2", "spectator"],
     ):
         """"""
         url = f"/api/0.1/cs2-matches/{match_id}/players"
         payload = {
-            'steam_id_64': steam_id,
+            'steam_id_64': str(steam_id),
             'team': team,
         }
 
         async with self.session.put(url=url, json=payload) as resp:
-            if resp.status == 401:
-                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
-            return resp.ok
+            if resp.ok:
+                resp_data = await resp.json()
+                return MatchPlayer.from_dict(resp_data)
+            elif resp.status == 401:
+                raise APIError("Invalid Dathost credentials!")
+            elif resp.status == 404:
+                raise APIError("Invalid match ID.")
+            else:
+                return APIError
                 
     async def cancel_match(self, match_id: int):
         """"""
         url = f"/api/0.1/cs2-matches/{match_id}/cancel"
 
         async with self.session.post(url=url) as resp:
-            if resp.status == 401:
-                raise APIError("Invalid credentials! Please use command `/auth` to update your credentials.")
-            return resp.ok
+            if resp.ok:
+                resp_data = await resp.json()
+                return Match.from_dict(resp_data)
+            elif resp.status == 401:
+                raise APIError("Invalid Dathost credentials!")
+            elif resp.status == 404:
+                raise APIError("Invalid match ID.")
+            else:
+                return APIError
