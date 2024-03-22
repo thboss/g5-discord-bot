@@ -18,8 +18,7 @@ class LobbyModel:
         captain_method: Literal["random", "volunteer", "rank"],
         map_method: Literal["random", "veto"],
         game_mode: Literal["competitive", "wingman"],
-        connect_time: int,
-        gs_location: str
+        connect_time: int
     ):
         """"""
         self.id = lobby_id
@@ -32,7 +31,6 @@ class LobbyModel:
         self.map_method = map_method
         self.game_mode = game_mode
         self.connect_time = connect_time
-        self.gs_location = gs_location
 
     @classmethod
     def from_dict(cls, data: dict, guild: discord.Guild) -> "LobbyModel":
@@ -47,6 +45,5 @@ class LobbyModel:
             data['captain_method'],
             data['map_method'],
             data['game_mode'],
-            data['connect_time'],
-            data['gs_location']
+            data['connect_time']
         )

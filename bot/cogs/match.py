@@ -227,12 +227,11 @@ class MatchCog(commands.Cog, name="Match"):
             if any(x is None for x in dropdown.users_selections.values()):
                 raise asyncio.TimeoutError
             location = choice(list(dropdown.users_selections.values()))
-            print(location)
 
             await message.edit(embed=Embed(description='Searching for available game servers...'), view=None)
             await asyncio.sleep(2)
 
-            game_server = await self.prepare_game_server(location, game_mode)
+            game_server = await self.fetch_game_server(location, game_mode)
 
             await message.edit(embed=Embed(description='Setting up match on game server...'), view=None)
             await asyncio.sleep(2)
@@ -317,7 +316,7 @@ class MatchCog(commands.Cog, name="Match"):
         except:
             pass
 
-    async def prepare_game_server(self, location, game_mode):
+    async def fetch_game_server(self, location, game_mode):
         """"""
         game_servers = await self.bot.api.get_game_servers()
 

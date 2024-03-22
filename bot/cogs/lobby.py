@@ -11,7 +11,6 @@ from discord import PermissionOverwrite, app_commands, Interaction, Embed, Membe
 from bot.bot import G5Bot
 from bot.helpers.models import LobbyModel
 from bot.helpers.errors import CustomError, JoinLobbyError
-from bot.helpers.utils import GAME_SERVER_LOCATIONS
 from bot.views import ReadyView
 
 
@@ -54,13 +53,9 @@ CONNECT_TIME_CHOICES = [
     app_commands.Choice(name="10 minute", value=600)
 ]
 
-GAME_SERVER_LOCATION_CHOICES = [
-    app_commands.Choice(name=v, value=k) for k, v in GAME_SERVER_LOCATIONS.items()
-]
-
 
 class LobbyCog(commands.Cog, name="Lobby"):
-    """"""
+    """A cog for managing lobbies."""
 
     def __init__(self, bot: G5Bot):
         self.bot = bot
@@ -77,7 +72,6 @@ class LobbyCog(commands.Cog, name="Lobby"):
         captains_method="Captains selection method",
         map_method="Map selection method",
         connect_time="Time in seconds until match is canceled if not everyone has joined",
-        game_server_location="Game server location"
     )
     @app_commands.choices(
         capacity=CAPACITY_CHOICES,
@@ -86,7 +80,6 @@ class LobbyCog(commands.Cog, name="Lobby"):
         map_method=MAP_SELECTION_CHOICES,
         game_mode=GAME_MODE_CHOICES,
         connect_time=CONNECT_TIME_CHOICES,
-        game_server_location=GAME_SERVER_LOCATION_CHOICES
     )
     @app_commands.checks.has_permissions(administrator=True)
     async def create_lobby(
@@ -94,7 +87,6 @@ class LobbyCog(commands.Cog, name="Lobby"):
         interaction: Interaction,
         capacity: app_commands.Choice[int],
         game_mode: app_commands.Choice[str],
-        game_server_location: app_commands.Choice[str],
         connect_time: app_commands.Choice[int],
         teams_method: app_commands.Choice[str],
         captains_method: app_commands.Choice[str],
@@ -122,7 +114,6 @@ class LobbyCog(commands.Cog, name="Lobby"):
             'guild': guild.id,
             'capacity': capacity.value,
             'game_mode': game_mode.value,
-            'gs_location': game_server_location.value,
             'connect_time': connect_time.value,
             'team_method': teams_method.value,
             'captain_method': captains_method.value,
@@ -132,7 +123,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
 
         lobby_id = await self.bot.db.insert_lobby(lobby_data)
 
-        await voice_channel.edit(name=f"Lobby #{lobby_id} [{game_server_location.name}]")
+        await voice_channel.edit(name=f"Lobby #{lobby_id}")
 
         lobby_model = await self.bot.db.get_lobby_by_id(lobby_id)
         await self.update_queue_msg(lobby_model)
@@ -379,8 +370,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
         """"""
         embed = Embed(title=title)
 
-        info_str = f"Server Location: *{GAME_SERVER_LOCATIONS[lobby_model.gs_location]}*\n" \
-                   f"Game mode: *{lobby_model.game_mode.capitalize()}*\n" \
+        info_str = f"Game mode: *{lobby_model.game_mode.capitalize()}*\n" \
                    f"Teams selection: *{lobby_model.team_method.capitalize()}*\n" \
                    f"Captains selection: *{lobby_model.captain_method.capitalize()}*\n" \
                    f"Maps selection: *{lobby_model.map_method.capitalize()}*"
