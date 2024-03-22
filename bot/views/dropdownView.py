@@ -14,28 +14,29 @@ class DropDownItems(Select):
     async def callback(self, interaction: Interaction):
         """ Handle the selection of dropdown options. """
         await interaction.response.defer()
-        self.view.selected_options = self.values
-        self.view.stop()
+        self.view.users_selections[interaction.user] = self.values[0]
+        if not any(x is None for x in self.view.users_selections.values()):
+            self.view.stop()
 
 class DropDownView(View):
     """ A view that displays a dropdown menu for selection. """
 
-    def __init__(self, author: Member, placeholder: str, options: List[SelectOption], min_values: int, max_values: int, timeout: float = 60.0):
+    def __init__(self, users: List[Member], placeholder: str, options: List[SelectOption], min_values: int, max_values: int, timeout: float = 60.0):
         """ Initialize the view with an author, placeholder text, options, value limits, and a timeout. """
         super().__init__(timeout=timeout)
-        self.author = author
-        self.selected_options = None  # This will store the user's selected options
+        self.users = users
+        self.users_selections = {users[0]: None, users[1]: None}
         # Add the dropdown item to the view.
         self.add_item(DropDownItems(placeholder, options, min_values, max_values))
 
     async def on_timeout(self):
         """ Handle the timeout event. """
-        self.selected_options = []  # Default to an empty list on timeout
+        self.users_selections = []  # Default to an empty list on timeout
         self.stop()
 
     async def interaction_check(self, interaction: Interaction) -> bool:
         """ Check if the interacting user is the author. """
-        if interaction.user != self.author:
+        if interaction.user not in self.users:
             await interaction.response.send_message("You are not allowed to interact with this!", ephemeral=True)
             return False
         return True

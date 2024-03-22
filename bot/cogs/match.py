@@ -1,19 +1,20 @@
 # match.py
 
 from discord.ext import commands
-from discord import Embed, Member, Message, Guild, PermissionOverwrite, VoiceChannel, app_commands, Interaction
+from discord import Embed, Member, Message, Guild, PermissionOverwrite, SelectOption, VoiceChannel, app_commands, Interaction
 from typing import List, Literal
 
 from random import choice, shuffle
 import asyncio
 
 from bot.helpers.api import Match
-from bot.helpers.utils import generate_api_key, generate_scoreboard_img
+from bot.helpers.utils import GAME_SERVER_LOCATIONS, generate_api_key, generate_scoreboard_img
 from bot.helpers.models import GuildModel, MatchModel
 from bot.bot import G5Bot
 from bot.helpers.errors import APIError, CustomError
 from bot.resources import Config
 from bot.views import VetoView, PickTeamsView
+from bot.views.dropdownView import DropDownView
 
 
 class MatchCog(commands.Cog, name="Match"):
@@ -184,7 +185,6 @@ class MatchCog(commands.Cog, name="Match"):
         captain_method: str='random',
         game_mode: str='competitive',
         connect_time: int=300,
-        location: str=None
     ):
         """"""
         await asyncio.sleep(3)
@@ -217,6 +217,17 @@ class MatchCog(commands.Cog, name="Match"):
                 map_name = veto_view.maps_left[0]
             else:
                 map_name = choice(mpool)
+
+            placeholder = "Choose your game server location"
+            options = [SelectOption(label=display_name, value=_id) for _id, display_name in GAME_SERVER_LOCATIONS.items()]
+            dropdown = DropDownView([team1_captain, team2_captain], placeholder, options, 1, 1)
+            await message.edit(embed=None, view=dropdown)
+            await dropdown.wait()
+
+            if any(x is None for x in dropdown.users_selections.values()):
+                raise asyncio.TimeoutError
+            location = choice(list(dropdown.users_selections.values()))
+            print(location)
 
             await message.edit(embed=Embed(description='Searching for available game servers...'), view=None)
             await asyncio.sleep(2)

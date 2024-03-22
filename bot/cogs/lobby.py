@@ -328,8 +328,7 @@ class LobbyCog(commands.Cog, name="Lobby"):
                         captain_method=lobby_model.captain_method,
                         map_method=lobby_model.map_method,
                         game_mode=lobby_model.game_mode,
-                        connect_time=lobby_model.connect_time,
-                        location=lobby_model.gs_location
+                        connect_time=lobby_model.connect_time
                     )
                     if not match_started:
                         awaitables = [u.move_to(guild_model.waiting_channel) for u in lobby_users]
